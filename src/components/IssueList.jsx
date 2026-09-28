@@ -338,7 +338,6 @@ export default function IssueList({ onBackToDashboard, refreshTrigger }) {
     setRootCause(matrix.root_cause || issue.root_cause || '');
     setCountermeasure(matrix.countermeasure || issue.countermeasure || '');
 
-    // Stage 1/4 is always empty for written action notes
     const s2_progress = matrix['2/4']?.progress || '';
     const s2_remark = matrix['2/4']?.remark || '';
     const s2_links = matrix['2/4']?.links || [];
@@ -373,7 +372,6 @@ export default function IssueList({ onBackToDashboard, refreshTrigger }) {
 
     setActiveStageTab(targetStage);
 
-    // Auto-forward only if target stage is empty and status is not 1/4
     setStageDetails((prev) => {
       if (newStatus === 'In Progress (1/4)') return prev;
 
@@ -955,7 +953,7 @@ export default function IssueList({ onBackToDashboard, refreshTrigger }) {
             </select>
           </div>
 
-          {/* 4. Group */}
+          {/* 4. Group Filter: Updated with Cold Test, Hot Test, Dyno Test */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               👥 Group:
@@ -967,7 +965,9 @@ export default function IssueList({ onBackToDashboard, refreshTrigger }) {
             >
               <option value="All">All Groups</option>
               <option value="Assembly Line">Assembly Line</option>
-              <option value="Test Line">Test Line</option>
+              <option value="Cold Test">Cold Test</option>
+              <option value="Hot Test">Hot Test</option>
+              <option value="Dyno Test">Dyno Test</option>
               <option value="7DCT">7DCT</option>
               <option value="EDU & DHT">EDU & DHT</option>
               <option value="IT">IT (All Stations)</option>
@@ -1307,7 +1307,7 @@ export default function IssueList({ onBackToDashboard, refreshTrigger }) {
                   onChange={(e) => handleStatusChange(e.target.value)}
                   style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #0d3b66', fontSize: '13px', backgroundColor: '#fff', fontWeight: 'bold' }}
                 >
-                  <option value="In Progress (1/4)">◔ In Progress (1/4)</option>
+                  <option value="In Progress (1/4)">◔ In Progress (1/4) (Newly Logged)</option>
                   <option value="In Progress (2/4)">◑ In Progress (2/4)</option>
                   <option value="In Progress (3/4)">◕ In Progress (3/4)</option>
                   <option value="Closed (4/4)">⚫ Closed (4/4)</option>
