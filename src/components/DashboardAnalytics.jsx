@@ -72,7 +72,7 @@ export default function DashboardAnalytics() {
     return String(Math.min(5, Math.ceil(dayNumber / 7)));
   };
 
-  // Helper untuk mengenali status Closed (termasuk "Closed (4/4)", "Completed", dll.)
+  // Helper to recognize Closed status (including "Closed (4/4)", "Completed", etc.)
   const isClosedStatus = (statusStr) => {
     if (!statusStr) return false;
     const s = String(statusStr).trim().toLowerCase();
@@ -163,10 +163,10 @@ export default function DashboardAnalytics() {
     let closedCount = 0;
     const locationMap = {};
     
-    // Klasifikasi Aging berdasarkan Estimated Closing Date
-    let agingHealthy = 0; // On Track (> 3 hari tersisa)
-    let agingDueSoon = 0; // Moderate / Due Soon (0 - 3 hari tersisa)
-    let agingOverdue = 0; // Critical Overdue (Melewati batas waktu penutupan)
+    // Aging classification based on Estimated Closing Date
+    let agingHealthy = 0; // On Track (> 3 days remaining)
+    let agingDueSoon = 0; // Moderate / Due Soon (0 - 3 days remaining)
+    let agingOverdue = 0; // Critical Overdue (Past estimated closing date)
 
     fullyFiltered.forEach((item) => {
       const isDone = isClosedStatus(item.status);
@@ -180,12 +180,11 @@ export default function DashboardAnalytics() {
       const loc = item.location ? item.location.toUpperCase() : 'UNKNOWN';
       locationMap[loc] = (locationMap[loc] || 0) + 1;
 
-      // Logika Aging khusus untuk issue yang masih pending / ongoing
+      // Aging breakdown for ongoing / unresolved issues
       if (!isDone) {
         const estStr = item.estimated_closing;
         if (estStr) {
           let estDate = null;
-          // Format ISO / YYYY-MM-DD
           if (estStr.includes('-')) {
             const parts = estStr.split('T')[0].split(' ')[0].split('-');
             if (parts[0].length === 4) {
@@ -193,7 +192,6 @@ export default function DashboardAnalytics() {
             } else {
               estDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
             }
-          // Format DD/MM/YY atau DD/MM/YYYY
           } else if (estStr.includes('/')) {
             const parts = estStr.split('/');
             const yearVal = parts[2].length === 2 ? Number('20' + parts[2]) : Number(parts[2]);
@@ -206,11 +204,11 @@ export default function DashboardAnalytics() {
             const diffDays = Math.ceil((targetClean.getTime() - todayClean.getTime()) / (1000 * 60 * 60 * 24));
 
             if (diffDays < 0) {
-              agingOverdue++; // Tanggal target sudah lewat
+              agingOverdue++;
             } else if (diffDays <= 3) {
-              agingDueSoon++; // Tersisa 0 - 3 hari
+              agingDueSoon++;
             } else {
-              agingHealthy++; // Masih banyak waktu (> 3 hari)
+              agingHealthy++;
             }
           } else {
             agingOverdue++;
@@ -289,7 +287,6 @@ export default function DashboardAnalytics() {
         .sort((a, b) => b.count - a.count)
     );
 
-    // Aging Donut Data dengan nama kategori dan warna yang selaras
     setAgingData([
       { name: 'On Track (Healthy)', count: agingHealthy, fill: '#16a34a' },
       { name: 'Due Soon (≤ 3 Days)', count: agingDueSoon, fill: '#eab308' },
@@ -310,8 +307,8 @@ export default function DashboardAnalytics() {
     processDashboard();
   }, [processDashboard]);
 
-  // Label persentase untuk Classification Pie Chart
-  const renderCustomPercentageLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }) => {
+  // Percentage label for Classification Pie Chart
+  const renderCustomPercentageLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
     if (!value || percent === 0) return null;
     const RADIAN = Math.PI / 180;
     const radius = outerRadius + 20;
@@ -332,7 +329,7 @@ export default function DashboardAnalytics() {
     );
   };
 
-  // Label persentase luar dengan garis penunjuk rapi
+  // Outer percentage label for Aging Donut Chart
   const renderAgingPercentageLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
     if (!value || percent === 0) return null;
     const RADIAN = Math.PI / 180;
@@ -386,6 +383,8 @@ export default function DashboardAnalytics() {
         
         {/* Dropdown Filters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          
+          {/* Updated Group Filter Options */}
           <select
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
@@ -393,8 +392,11 @@ export default function DashboardAnalytics() {
           >
             <option value="all">All Groups</option>
             <option value="Assembly Line">Assembly Line</option>
-            <option value="Test Line">Test Line</option>
-            <option value="Transmission Line">Transmission Line</option>
+            <option value="Cold Test">Cold Test</option>
+            <option value="Hot Test">Hot Test</option>
+            <option value="Dyno Test">Dyno Test</option>
+            <option value="7DCT">7DCT</option>
+            <option value="EDU & DHT">EDU & DHT</option>
             <option value="IT">IT</option>
           </select>
 
