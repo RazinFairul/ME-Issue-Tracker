@@ -40,7 +40,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated }) {
 
   const fileInputRef = useRef(null);
 
-  // 1. Pulihkan draf daripada localStorage semasa komponen mula dimuatkan
+  // 1. Restore draft from localStorage on initial component mount
   useEffect(() => {
     const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (savedDraft) {
@@ -63,7 +63,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated }) {
     }
   }, []);
 
-  // 2. Simpan draf ke localStorage setiap kali ada medan teks yang berubah
+  // 2. Save draft to localStorage whenever fields change
   useEffect(() => {
     const draftPayload = {
       whatIssue,
@@ -107,7 +107,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated }) {
     linkList,
   ]);
 
-  // Fungsi mengosongkan draf secara manual
+  // Clear draft manually
   const handleClearDraft = () => {
     const confirmClear = window.confirm('Are you sure you want to clear this draft and reset all fields?');
     if (!confirmClear) return;
@@ -479,7 +479,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated }) {
         throw insertError;
       }
 
-      // 3. Padam draf setelah rekod berjaya dimasukkan ke Supabase
+      // 3. Clear draft after successful insertion to Supabase
       localStorage.removeItem(DRAFT_STORAGE_KEY);
 
       alert('Issue submitted successfully!');
@@ -573,7 +573,9 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated }) {
           >
             <option value="" disabled hidden>Choose Group</option>
             <option value="Assembly Line" style={{ color: '#000' }}>Assembly Line</option>
-            <option value="Test Line" style={{ color: '#000' }}>Test Line</option>
+            <option value="Cold Test" style={{ color: '#000' }}>Cold Test</option>
+            <option value="Hot Test" style={{ color: '#000' }}>Hot Test</option>
+            <option value="Dyno Test" style={{ color: '#000' }}>Dyno Test</option>
             <option value="7DCT" style={{ color: '#000' }}>7DCT</option>
             <option value="EDU & DHT" style={{ color: '#000' }}>EDU & DHT</option>
             <option value="IT" style={{ color: '#000' }}>IT (All Stations)</option>
