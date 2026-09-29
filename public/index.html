@@ -20,6 +20,27 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
     <title>ME Powertrain</title>
+
+    <!-- Patch: Elak ralat NotFoundError / skrin putih React semasa Google Translate aktif -->
+    <script type="text/javascript">
+      if (typeof Node === 'function' && Node.prototype) {
+        const origRemoveChild = Node.prototype.removeChild;
+        Node.prototype.removeChild = function (child) {
+          if (child.parentNode !== this) {
+            return child;
+          }
+          return origRemoveChild.apply(this, arguments);
+        };
+
+        const origInsertBefore = Node.prototype.insertBefore;
+        Node.prototype.insertBefore = function (newNode, referenceNode) {
+          if (referenceNode && referenceNode.parentNode !== this) {
+            return newNode;
+          }
+          return origInsertBefore.apply(this, arguments);
+        };
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
