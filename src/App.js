@@ -8,6 +8,7 @@ import IssueList from './components/IssueList';
 import TagMapUpdates from './components/TagMap';
 import DashboardAnalytics from './components/DashboardAnalytics';
 import EditProfileModal from './components/EditProfileModal';
+import LiveDateTime from './components/LiveDateTime';
 
 const TIMEOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes (300,000 ms)
 
@@ -374,12 +375,27 @@ export default function App() {
 
   return (
     <div className={`dashboard-container ${isPortrait ? 'is-portrait' : 'is-landscape'}`}>
-      {/* Top Navigation Bar */}
-      <div className="top-nav" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      {/* Top Navigation Bar with Centered LiveDateTime */}
+      <div 
+        className="top-nav" 
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '20px', 
+          flexWrap: 'wrap', 
+          gap: '10px' 
+        }}
+      >
         <div>
           <button className="exit-btn" onClick={handleLogout}>
             <span style={{ fontSize: '18px' }}>🚪</span> Logout
           </button>
+        </div>
+
+        {/* Live Digital Clock & Date */}
+        <div>
+          <LiveDateTime />
         </div>
 
         <div>

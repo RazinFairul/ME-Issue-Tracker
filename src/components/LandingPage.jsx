@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import LiveDateTime from './LiveDateTime';
 import './LandingPage.css';
 
 export default function LandingPage({ onGoToLogin }) {
@@ -41,19 +40,6 @@ export default function LandingPage({ onGoToLogin }) {
         position: 'relative'
       }}
     >
-      {/* Top Bar DateTime Header */}
-      <div 
-        style={{
-          position: 'absolute',
-          top: '16px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 10
-        }}
-      >
-        <LiveDateTime />
-      </div>
-
       {/* Floating Login Button */}
       <button 
         className="animated-login-btn" 

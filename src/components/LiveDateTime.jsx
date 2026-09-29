@@ -10,43 +10,58 @@ export default function LiveDateTime() {
     return () => clearInterval(timer);
   }, []);
 
-  // Format Tarikh: Contoh "Tue, 29 Sep 2026"
-  const formattedDate = currentDateTime.toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  });
+  // Format Jam: 11:59:37 (24-hour atau format digital tebal)
+  const hours = String(currentDateTime.getHours()).padStart(2, '0');
+  const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
+  const seconds = String(currentDateTime.getSeconds()).padStart(2, '0');
+  const formattedTime = `${hours}:${minutes}:${seconds}`;
 
-  // Format Jam: Contoh "11:25:40 AM"
-  const formattedTime = currentDateTime.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
+  // Format Tarikh: 29/09/2026
+  const day = String(currentDateTime.getDate()).padStart(2, '0');
+  const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
+  const year = currentDateTime.getFullYear();
+  const formattedDate = `${day}/${month}/${year}`;
 
   return (
     <div
       style={{
+        backgroundColor: '#0d3b66',
+        color: '#ffffff',
+        padding: '5px 16px',
+        borderRadius: '8px',
         display: 'inline-flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        gap: '8px',
-        backgroundColor: '#f1f5f9',
-        border: '1px solid #cbd5e1',
-        padding: '6px 14px',
-        borderRadius: '20px',
-        color: '#0d3b66',
-        fontSize: '13px',
-        fontWeight: 'bold',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-        whiteSpace: 'nowrap'
+        justifyContent: 'center',
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
+        lineHeight: 1.15,
+        userSelect: 'none'
       }}
     >
-      <span>🗓️ {formattedDate}</span>
-      <span style={{ color: '#94a3b8' }}>|</span>
-      <span style={{ color: '#0284c7', fontFamily: 'monospace', fontSize: '13px' }}>
-        ⏰ {formattedTime}
+      {/* Baris Atas: Masa Besar & Tebal */}
+      <span
+        style={{
+          fontSize: '18px',
+          fontWeight: '800',
+          letterSpacing: '1px',
+          fontFamily: 'system-ui, -apple-system, sans-serif'
+        }}
+      >
+        {formattedTime}
+      </span>
+
+      {/* Baris Bawah: Tarikh DD/MM/YYYY */}
+      <span
+        style={{
+          fontSize: '12px',
+          fontWeight: '500',
+          color: '#cbd5e1',
+          letterSpacing: '0.5px',
+          marginTop: '2px',
+          fontFamily: 'system-ui, -apple-system, sans-serif'
+        }}
+      >
+        {formattedDate}
       </span>
     </div>
   );
