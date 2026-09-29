@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
+const MONTH_NAMES = [
+  'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
+  'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
+];
+
 export default function LiveDateTime() {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
@@ -17,20 +22,19 @@ export default function LiveDateTime() {
   const hours = String(hours12).padStart(2, '0');
   const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
   const seconds = String(currentDateTime.getSeconds()).padStart(2, '0');
-  const formattedTime = `${hours}:${minutes}:${seconds} ${ampm}`;
 
-  // Format Tarikh: DD/MM/YYYY
+  // Format Tarikh dalam Bahasa Inggeris (Contoh: 29 SEPTEMBER 2026)
   const day = String(currentDateTime.getDate()).padStart(2, '0');
-  const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
+  const monthName = MONTH_NAMES[currentDateTime.getMonth()];
   const year = currentDateTime.getFullYear();
-  const formattedDate = `${day}/${month}/${year}`;
+  const formattedDate = `${day} ${monthName} ${year}`;
 
   return (
     <div
       style={{
         backgroundColor: '#0d3b66',
         color: '#ffffff',
-        padding: '6px 14px',
+        padding: '6px 16px',
         borderRadius: '8px',
         display: 'inline-flex',
         flexDirection: 'column',
@@ -59,13 +63,13 @@ export default function LiveDateTime() {
         </span>
       </span>
 
-      {/* Baris Bawah: Tarikh DD/MM/YYYY */}
+      {/* Baris Bawah: Tarikh (Contoh: 29 SEPTEMBER 2026) */}
       <span
         style={{
           fontSize: '11px',
-          fontWeight: '500',
+          fontWeight: '600',
           color: '#cbd5e1',
-          letterSpacing: '0.5px',
+          letterSpacing: '0.8px',
           marginTop: '3px',
           fontFamily: 'system-ui, -apple-system, sans-serif'
         }}
