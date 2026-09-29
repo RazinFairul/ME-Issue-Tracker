@@ -375,7 +375,7 @@ export default function App() {
 
   return (
     <div className={`dashboard-container ${isPortrait ? 'is-portrait' : 'is-landscape'}`}>
-      {/* Top Navigation Bar with Centered LiveDateTime */}
+      {/* Top Navigation Bar with Centered LiveDateTime & Google Translate */}
       <div 
         className="top-nav" 
         style={{ 
@@ -393,9 +393,10 @@ export default function App() {
           </button>
         </div>
 
-        {/* Live Digital Clock & Date */}
-        <div>
+        {/* Live Digital Clock, Date & Language Translate Widget */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <LiveDateTime />
+          <div id="google_translate_element"></div>
         </div>
 
         <div>
