@@ -17,6 +17,12 @@ const DEFAULT_STAGES = {
   '4/4': { progress: '', remark: '', links: [] }
 };
 
+// Helper: Semak jika mod bahasa sekarang adalah Bahasa Melayu
+const isMalaySelected = () => {
+  if (typeof document === 'undefined') return false;
+  return document.cookie.includes('googtrans=/en/ms') || document.documentElement.lang === 'ms';
+};
+
 export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger }) {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -807,6 +813,8 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     XLSX.writeFile(workbook, `Issues_Report_${groupLabel}_${currentPeriodLabel}_${today}.xlsx`);
   };
 
+  const isMalay = isMalaySelected();
+
   return (
     <div style={{ padding: '10px 20px', maxWidth: '1280px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
       
@@ -884,7 +892,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
           </div>
         </div>
 
-        {/* Row 2: Strict Order */}
+        {/* Row 2: Filters */}
         <div 
           style={{ 
             display: 'grid', 
@@ -953,7 +961,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 4. Group Filter: Updated with Cold Test, Hot Test, Dyno Test */}
+          {/* 4. Group Filter: Protected from translation */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               👥 Group:
@@ -961,6 +969,8 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             <select
               value={groupFilter}
               onChange={handleGroupFilterChange}
+              className="notranslate"
+              translate="no"
               style={{ width: '100%', padding: '6px 4px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '11px', backgroundColor: '#fff', boxSizing: 'border-box', cursor: 'pointer' }}
             >
               <option value="All">All Groups</option>
@@ -974,7 +984,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 5. Location */}
+          {/* 5. Location: Protected from translation */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               📍 Location:
@@ -982,6 +992,8 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             <select
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
+              className="notranslate"
+              translate="no"
               style={{ width: '100%', padding: '6px 4px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '11px', backgroundColor: '#fff', boxSizing: 'border-box', cursor: 'pointer' }}
             >
               <option value="All">All Locations ({filteredLocationOptions.length})</option>
@@ -991,7 +1003,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 6. Engine Variant */}
+          {/* 6. Engine Variant: Protected from translation */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               ⚙️ Engine Variant:
@@ -999,6 +1011,8 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             <select
               value={engineVariantFilter}
               onChange={(e) => setEngineVariantFilter(e.target.value)}
+              className="notranslate"
+              translate="no"
               style={{ width: '100%', padding: '6px 4px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '11px', backgroundColor: '#fff', boxSizing: 'border-box', cursor: 'pointer' }}
             >
               <option value="All">All Variants ({uniqueEngineVariants.length})</option>
@@ -1008,7 +1022,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 7. Name */}
+          {/* 7. Name: Protected from translation */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               👤 Name:
@@ -1016,6 +1030,8 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             <select
               value={nameFilter}
               onChange={(e) => setNameFilter(e.target.value)}
+              className="notranslate"
+              translate="no"
               style={{ width: '100%', padding: '6px 4px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '11px', backgroundColor: '#fff', boxSizing: 'border-box', cursor: 'pointer' }}
             >
               <option value="All">All Names</option>
@@ -1098,12 +1114,23 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     </div>
                   )}
 
+                  {/* Field Protected with notranslate: Group, Name, Location, Engine Variant, PIC */}
                   <div style={{ fontSize: '12px', color: '#444', display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
-                    <div>👥 <b>Group:</b> {issue.group_name || '-'}</div>
-                    <div>👤 <b>Name:</b> {issue.staff_name || issue.staff_id || '-'}</div>
-                    <div>📍 <b>Location:</b> {issue.location || '-'}</div>
-                    <div>⚙️ <b>Engine Variant:</b> {issue.engine_variant || '-'}</div>
-                    <div>👤 <b>PIC:</b> {issue.pic_name || issue.pic || '-'}</div>
+                    <div>
+                      👥 <b>Group:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.group_name || '-'}</span>
+                    </div>
+                    <div>
+                      👤 <b>Name:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.staff_name || issue.staff_id || '-'}</span>
+                    </div>
+                    <div>
+                      📍 <b>Location:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.location || '-'}</span>
+                    </div>
+                    <div>
+                      ⚙️ <b>Engine Variant:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.engine_variant || '-'}</span>
+                    </div>
+                    <div>
+                      👤 <b>PIC:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.pic_name || issue.pic || '-'}</span>
+                    </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       <span>🎯 <b>Est. Closing:</b></span>
@@ -1150,11 +1177,15 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                       )}
                     </div>
 
-                    {/* Overall Root Cause & Countermeasure */}
+                    {/* Overall Root Cause & Countermeasure (= Langkah Balas for Malay) */}
                     {(matrix.root_cause || matrix.countermeasure) && (
                       <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '6px 8px', marginTop: '6px', fontSize: '11px' }}>
                         {matrix.root_cause && <div>🔍 <b>Root Cause:</b> {matrix.root_cause}</div>}
-                        {matrix.countermeasure && <div style={{ marginTop: '3px' }}>🛠️ <b>Countermeasure:</b> {matrix.countermeasure}</div>}
+                        {matrix.countermeasure && (
+                          <div style={{ marginTop: '3px' }}>
+                            🛠️ <b>{isMalay ? 'Langkah Balas:' : 'Countermeasure:'}</b> {matrix.countermeasure}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1325,7 +1356,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
               {/* 1. Root Cause & Countermeasure */}
               <div style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '6px', padding: '12px', marginBottom: '16px' }}>
                 <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#1e3a8a', display: 'block', marginBottom: '8px' }}>
-                  📋 Overall Root Cause & Countermeasure:
+                  📋 Overall Root Cause & {isMalay ? 'Langkah Balas' : 'Countermeasure'}:
                 </span>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px' }}>
@@ -1344,7 +1375,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
 
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', display: 'block', marginBottom: '3px' }}>
-                      Countermeasure:
+                      {isMalay ? 'Langkah Balas:' : 'Countermeasure:'}
                     </label>
                     <textarea
                       rows="2"
