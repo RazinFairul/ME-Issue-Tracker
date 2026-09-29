@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import XLSX from 'xlsx-js-style';
-import LiveDateTime from './LiveDateTime';
 import { supabase } from '../supabaseClient';
 
 const STAGE_ORDER = {
@@ -275,15 +274,6 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
       setNewEstClosingDate('');
     }
     setSavingEstDate(false);
-  };
-
-  const handleLogout = async () => {
-    if (onLogout) {
-      onLogout();
-    } else {
-      await supabase.auth.signOut();
-      window.location.reload();
-    }
   };
 
   const formatDateTime = (dateTimeStr) => {
@@ -820,60 +810,6 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
   return (
     <div style={{ padding: '10px 20px', maxWidth: '1280px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
       
-      {/* Top Header Bar: Logout - LiveDateTime - Back to Dashboard */}
-      <div 
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '20px', 
-          flexWrap: 'wrap', 
-          gap: '10px' 
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleLogout}
-          style={{
-            backgroundColor: '#fee2e2',
-            color: '#dc2626',
-            border: '1px solid #fca5a5',
-            borderRadius: '6px',
-            padding: '8px 14px',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          🚪 Logout
-        </button>
-
-        <LiveDateTime />
-
-        <button
-          type="button"
-          onClick={onBackToDashboard}
-          style={{
-            backgroundColor: '#0d3b66',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            padding: '8px 14px',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          ⬅️ Back to Dashboard
-        </button>
-      </div>
-
       {/* Main Title Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', backgroundColor: '#0d3b66', padding: '15px 20px', borderRadius: '8px', color: '#fff', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '22px' }}>Issue List</h2>
@@ -1017,7 +953,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 4. Group Filter: Cold Test, Hot Test, Dyno Test */}
+          {/* 4. Group Filter: Updated with Cold Test, Hot Test, Dyno Test */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               👥 Group:
@@ -1515,7 +1451,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     🔗 Attachment Links for Stage {activeStageTab}:
                   </label>
 
-                  <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                     <input
                       type="url"
                       placeholder="Paste Link"
