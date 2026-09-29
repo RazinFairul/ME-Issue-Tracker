@@ -10,13 +10,16 @@ export default function LiveDateTime() {
     return () => clearInterval(timer);
   }, []);
 
-  // Format Jam: 11:59:37 (24-hour atau format digital tebal)
-  const hours = String(currentDateTime.getHours()).padStart(2, '0');
+  // Format 12-Jam bersama AM / PM
+  const rawHours = currentDateTime.getHours();
+  const ampm = rawHours >= 12 ? 'PM' : 'AM';
+  const hours12 = rawHours % 12 || 12; // Menukarkan 0 ke 12 untuk tengah malam
+  const hours = String(hours12).padStart(2, '0');
   const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
   const seconds = String(currentDateTime.getSeconds()).padStart(2, '0');
-  const formattedTime = `${hours}:${minutes}:${seconds}`;
+  const formattedTime = `${hours}:${minutes}:${seconds} ${ampm}`;
 
-  // Format Tarikh: 29/09/2026
+  // Format Tarikh: DD/MM/YYYY
   const day = String(currentDateTime.getDate()).padStart(2, '0');
   const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
   const year = currentDateTime.getFullYear();
@@ -27,7 +30,7 @@ export default function LiveDateTime() {
       style={{
         backgroundColor: '#0d3b66',
         color: '#ffffff',
-        padding: '5px 16px',
+        padding: '6px 14px',
         borderRadius: '8px',
         display: 'inline-flex',
         flexDirection: 'column',
@@ -38,26 +41,32 @@ export default function LiveDateTime() {
         userSelect: 'none'
       }}
     >
-      {/* Baris Atas: Masa Besar & Tebal */}
+      {/* Baris Atas: Jam 12-Jam & AM/PM */}
       <span
         style={{
-          fontSize: '18px',
+          fontSize: '16px',
           fontWeight: '800',
-          letterSpacing: '1px',
-          fontFamily: 'system-ui, -apple-system, sans-serif'
+          letterSpacing: '0.8px',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '4px'
         }}
       >
-        {formattedTime}
+        <span>{`${hours}:${minutes}:${seconds}`}</span>
+        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#93c5fd' }}>
+          {ampm}
+        </span>
       </span>
 
       {/* Baris Bawah: Tarikh DD/MM/YYYY */}
       <span
         style={{
-          fontSize: '12px',
+          fontSize: '11px',
           fontWeight: '500',
           color: '#cbd5e1',
           letterSpacing: '0.5px',
-          marginTop: '2px',
+          marginTop: '3px',
           fontFamily: 'system-ui, -apple-system, sans-serif'
         }}
       >
