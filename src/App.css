@@ -2,7 +2,47 @@
   box-sizing: border-box;
 }
 
-/* Dashboard Main Container */
+/* =========================================================
+   Global Google Translate & Browser Reset
+   ========================================================= */
+
+/* Completely hide the top Google Translate banner bar and balloons */
+.goog-te-banner-frame,
+.goog-te-banner-frame.skiptranslate,
+body > .skiptranslate,
+iframe.goog-te-banner-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0px !important;
+  width: 0px !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Prevent Google Translate from pushing the webpage body downward */
+body {
+  top: 0px !important;
+  position: static !important;
+}
+
+/* Remove default gray/blue highlights applied by translation */
+font {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Hide default browser reveal/clear icons in password inputs */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}
+
+/* =========================================================
+   Dashboard Main Container
+   ========================================================= */
 .dashboard-container {
   max-width: 1150px;
   margin: 0 auto;
@@ -56,7 +96,7 @@
 }
 
 /* =========================================================
-   1. LAPTOP / DESKTOP / TABLET LANDSKAP (Default Grid 2x2)
+   1. Laptop / Desktop / Tablet Landscape (Default Grid 2x2)
    ========================================================= */
 .dashboard-grid {
   display: grid;
@@ -66,7 +106,7 @@
   width: 100%;
 }
 
-/* Left Hero Card (Kad Selamat Datang & Profil) */
+/* Left Hero Card (Welcome & Profile Card) */
 .hero-card {
   grid-column: 1 / 2;
   grid-row: 1 / 3;
@@ -147,7 +187,7 @@
   font-weight: 700;
 }
 
-/* 4 Kad Menu */
+/* Menu Action Cards */
 .menu-card {
   position: relative;
   border-radius: 16px;
@@ -182,7 +222,7 @@
   font-weight: 600;
 }
 
-/* Gambar Latar Belakang Setiap Kad */
+/* Menu Card Background Images */
 .card-list {
   background-image: url('ListIssues.jpg');
 }
@@ -212,9 +252,7 @@
 }
 
 /* =========================================================
-   2. SUSUN ATUR PORTRAIT (100% MENGIKUT PHONE UNTUK TAB & HP)
-   Menerapkan flex-direction column bila peranti dalam mod potret
-   atau skrin telefon (<= 768px)
+   2. Responsive Portrait Layout (Mobile Phones & Tablets)
    ========================================================= */
 @media screen and (orientation: portrait), screen and (max-width: 768px) {
   .dashboard-container {
