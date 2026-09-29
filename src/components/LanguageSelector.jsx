@@ -27,10 +27,21 @@ const LANGUAGES = [
   { code: 'bn', name: 'Bengali', native: 'বাংলা' }
 ];
 
+// Dapatkan bahasa semasa daripada kuki googtrans jika wujud
+const getInitialLanguage = () => {
+  const match = document.cookie.match(/(^|;\s*)googtrans=([^;]+)/);
+  if (match && match[2]) {
+    const parts = decodeURIComponent(match[2]).split('/');
+    const currentCode = parts[parts.length - 1];
+    if (currentCode) return currentCode;
+  }
+  return 'en';
+};
+
 export default function LanguageSelector() {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [selectedLang, setSelectedLang] = useState('en');
+  const [selectedLang, setSelectedLang] = useState(getInitialLanguage());
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -48,14 +59,24 @@ export default function LanguageSelector() {
     setIsOpen(false);
     setSearch('');
 
+    // 1. Simpan kuki rasmi Google Translate (Domain semasa + Host)
+    const hostname = window.location.hostname;
+    document.cookie = `googtrans=/en/${langCode}; path=/;`;
+    if (hostname !== 'localhost') {
+      document.cookie = `googtrans=/en/${langCode}; domain=.${hostname}; path=/;`;
+    }
+
+    // 2. Trigger select dropdown Google jika sedia ada
     const selectEl = document.querySelector('.goog-te-combo');
     if (selectEl) {
       selectEl.value = langCode;
-      selectEl.dispatchEvent(new Event('change'));
-    } else {
-      document.cookie = `googtrans=/en/${langCode}; path=/;`;
-      window.location.reload();
+      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
     }
+
+    // 3. Muat semula pantas untuk memastikan keseluruhan skrin diterjemahkan pada klik pertama
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const filteredLanguages = LANGUAGES.filter((item) => {
