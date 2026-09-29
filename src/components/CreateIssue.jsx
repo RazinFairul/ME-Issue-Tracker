@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import LiveDateTime from './LiveDateTime';
 import { supabase } from '../supabaseClient';
 import imageCompression from 'browser-image-compression';
 
@@ -127,15 +126,6 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
     setTempLinkInput('');
     handleRemoveFile();
     setHasRestoredDraft(false);
-  };
-
-  const handleLogout = async () => {
-    if (onLogout) {
-      onLogout();
-    } else {
-      await supabase.auth.signOut();
-      window.location.reload();
-    }
   };
 
   // Fetch stations from Supabase table based on selected Group
@@ -509,60 +499,6 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
   return (
     <div style={{ padding: '16px 20px 40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
       
-      {/* Top Header Bar: Logout - LiveDateTime - Back to Dashboard */}
-      <div 
-        style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '20px', 
-          flexWrap: 'wrap', 
-          gap: '10px' 
-        }}
-      >
-        <button
-          type="button"
-          onClick={handleLogout}
-          style={{
-            backgroundColor: '#fee2e2',
-            color: '#dc2626',
-            border: '1px solid #fca5a5',
-            borderRadius: '6px',
-            padding: '8px 14px',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          🚪 Logout
-        </button>
-
-        <LiveDateTime />
-
-        <button
-          type="button"
-          onClick={onBackToDashboard}
-          style={{
-            backgroundColor: '#0d3b66',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            padding: '8px 14px',
-            fontSize: '13px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          ⬅️ Back to Dashboard
-        </button>
-      </div>
-
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
         <h2 style={{ color: '#0d3b66', margin: 0 }}>Open Issue</h2>
         {hasRestoredDraft && (
