@@ -148,6 +148,14 @@ export default function Auth({ onLoginSuccess, forceRecoveryMode = false, onPass
         fontFamily: 'Arial, sans-serif',
       }}
     >
+      {/* Sembunyikan ikon mata bawaan pelayar Edge / Internet Explorer */}
+      <style>{`
+        input::-ms-reveal,
+        input::-ms-clear {
+          display: none !important;
+        }
+      `}</style>
+
       <h2 style={{ textAlign: 'center', color: '#0d3b66', marginBottom: '20px' }}>
         {authMode === 'signup' && 'Staff Registration'}
         {authMode === 'login' && 'Staff Login'}
@@ -204,7 +212,7 @@ export default function Auth({ onLoginSuccess, forceRecoveryMode = false, onPass
           </div>
         )}
 
-        {/* Full Name & Staff ID (Sign Up ) */}
+        {/* Full Name & Staff ID (Sign Up) */}
         {authMode === 'signup' && (
           <>
             <div>
