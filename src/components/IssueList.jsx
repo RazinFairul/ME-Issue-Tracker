@@ -204,7 +204,6 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     return Array.from(new Set(issues.map((i) => i.staff_name || i.staff_id).filter(Boolean))).sort();
   }, [issues]);
 
-  // Only the original reporter is authorized to edit or delete
   const checkCanEdit = (issue) => {
     if (!currentUser || !issue) return false;
 
@@ -330,7 +329,6 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     }
   };
 
-  // Load issue data into modal
   const loadOriginalIssueData = (issue) => {
     let cur = issue.status || 'In Progress (1/4)';
     if (cur === 'Open') cur = 'In Progress (1/4)';
@@ -1114,7 +1112,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     </div>
                   )}
 
-                  {/* Field Protected with notranslate: Group, Name, Location, Engine Variant, PIC */}
+                  {/* Protected Fields: Group, Name, Location, Engine Variant, PIC */}
                   <div style={{ fontSize: '12px', color: '#444', display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
                     <div>
                       👥 <b>Group:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.group_name || '-'}</span>
@@ -1129,7 +1127,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                       ⚙️ <b>Engine Variant:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.engine_variant || '-'}</span>
                     </div>
                     <div>
-                      👤 <b>PIC:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.pic_name || issue.pic || '-'}</span>
+                      👤 <b className="notranslate" translate="no">PIC:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.pic_name || issue.pic || '-'}</span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
