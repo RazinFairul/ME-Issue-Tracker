@@ -9,6 +9,7 @@ import TagMapUpdates from './components/TagMap';
 import DashboardAnalytics from './components/DashboardAnalytics';
 import EditProfileModal from './components/EditProfileModal';
 import LiveDateTime from './components/LiveDateTime';
+import LanguageSelector from './components/LanguageSelector';
 
 const TIMEOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes (300,000 ms)
 
@@ -318,6 +319,7 @@ export default function App() {
             handleLogout();
           }} 
         />
+        <LanguageSelector />
       </div>
     );
   }
@@ -351,10 +353,16 @@ export default function App() {
               setActiveTab('list');
             }
           }} />
+          <LanguageSelector />
         </div>
       );
     }
-    return <LandingPage onGoToLogin={openLogin} />;
+    return (
+      <>
+        <LandingPage onGoToLogin={openLogin} />
+        <LanguageSelector />
+      </>
+    );
   }
 
   // 3. AUTHENTICATED DASHBOARD
@@ -375,7 +383,7 @@ export default function App() {
 
   return (
     <div className={`dashboard-container ${isPortrait ? 'is-portrait' : 'is-landscape'}`}>
-      {/* Top Navigation Bar with Centered LiveDateTime & Google Translate */}
+      {/* Top Navigation Bar with Centered LiveDateTime */}
       <div 
         className="top-nav" 
         style={{ 
@@ -393,10 +401,9 @@ export default function App() {
           </button>
         </div>
 
-        {/* Live Digital Clock, Date & Language Translate Widget */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        {/* Live Digital Clock & Date */}
+        <div>
           <LiveDateTime />
-          <div id="google_translate_element"></div>
         </div>
 
         <div>
@@ -558,6 +565,9 @@ export default function App() {
       <div className="footer">
         <span>©</span> Developed by Razin ME
       </div>
+
+      {/* Floating Bottom-Right Searchable Language Selector */}
+      <LanguageSelector />
     </div>
   );
 }
