@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import LiveDateTime from './LiveDateTime';
 import './LandingPage.css';
 
 export default function LandingPage({ onGoToLogin }) {
-  // Fungsi untuk semak sama ada skrin patut guna paparan Potret (Mobile & Tablet/iPad Portrait)
+  // Determine whether to display the portrait/mobile layout (Mobile & Tablet/iPad Portrait)
   const checkIsPortraitOrMobile = () => {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const isPortrait = height > width;
 
-    // Gunakan gambar mobile jika lebar <= 1024px DALAM keadaan potret, ATAU skrin telefon biasa (<= 768px)
+    // Use mobile layout if width <= 1024px in portrait orientation, or standard phone width (<= 768px)
     return (isPortrait && width <= 1024) || width <= 768;
   };
 
@@ -36,10 +37,24 @@ export default function LandingPage({ onGoToLogin }) {
     <div 
       className="embed-landing-container"
       style={{
-        backgroundImage: `url(${bgImage})`
+        backgroundImage: `url(${bgImage})`,
+        position: 'relative'
       }}
     >
-      {/* Butang Kuning Timbul Tepat */}
+      {/* Top Bar DateTime Header */}
+      <div 
+        style={{
+          position: 'absolute',
+          top: '16px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10
+        }}
+      >
+        <LiveDateTime />
+      </div>
+
+      {/* Floating Login Button */}
       <button 
         className="animated-login-btn" 
         onClick={onGoToLogin}

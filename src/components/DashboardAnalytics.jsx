@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import LiveDateTime from './LiveDateTime';
 import { supabase } from '../supabaseClient';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -26,7 +27,7 @@ const CLASS_COLORS = {
   'UNCLASSIFIED': '#94a3b8'
 };
 
-export default function DashboardAnalytics() {
+export default function DashboardAnalytics({ onBack, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [rawIssues, setRawIssues] = useState([]);
   
@@ -307,6 +308,15 @@ export default function DashboardAnalytics() {
     processDashboard();
   }, [processDashboard]);
 
+  const handleLogout = async () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      await supabase.auth.signOut();
+      window.location.reload();
+    }
+  };
+
   // Percentage label for Classification Pie Chart
   const renderCustomPercentageLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
     if (!value || percent === 0) return null;
@@ -377,14 +387,67 @@ export default function DashboardAnalytics() {
   return (
     <div style={{ padding: '20px', maxWidth: '1300px', margin: '0 auto', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' }}>
       
-      {/* Header Bar */}
+      {/* Top Header Bar: Logout - LiveDateTime - Back to Dashboard */}
+      <div 
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '20px', 
+          flexWrap: 'wrap', 
+          gap: '10px' 
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleLogout}
+          style={{
+            backgroundColor: '#fee2e2',
+            color: '#dc2626',
+            border: '1px solid #fca5a5',
+            borderRadius: '6px',
+            padding: '8px 14px',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          🚪 Logout
+        </button>
+
+        <LiveDateTime />
+
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            backgroundColor: '#0d3b66',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '8px 14px',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          ⬅️ Back to Dashboard
+        </button>
+      </div>
+
+      {/* Analytics Control Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', backgroundColor: '#0d3b66', padding: '15px 20px', borderRadius: '8px', color: '#fff', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontSize: '22px' }}>Dashboard Analytics</h2>
         
         {/* Dropdown Filters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           
-          {/* Updated Group Filter Options */}
           <select
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}

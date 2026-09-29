@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import LiveDateTime from './LiveDateTime';
 import { supabase } from "../supabaseClient";
 
-export default function TagMap({ onBack }) {
+export default function TagMap({ onBack, onLogout }) {
   const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -133,6 +134,15 @@ export default function TagMap({ onBack }) {
     }
   };
 
+  const handleLogout = async () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      await supabase.auth.signOut();
+      window.location.reload();
+    }
+  };
+
   // Filter Logic
   const filteredUpdates = updates.filter((item) => {
     const matchesDate = !filterDate || item.date === filterDate;
@@ -144,12 +154,66 @@ export default function TagMap({ onBack }) {
   });
 
   return (
-    <div style={{ padding: "16px 12px", maxWidth: "1200px", margin: "0 auto", backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: "16px 20px 40px", maxWidth: "1280px", margin: "0 auto", backgroundColor: "#f8fafc", minHeight: "100vh", fontFamily: "Arial, sans-serif" }}>
 
-      {/* Banner Title */}
+      {/* Top Header Bar: Logout - LiveDateTime - Back to Dashboard */}
+      <div 
+        style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          marginBottom: "20px", 
+          flexWrap: "wrap", 
+          gap: "10px" 
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleLogout}
+          style={{
+            backgroundColor: "#fee2e2",
+            color: "#dc2626",
+            border: "1px solid #fca5a5",
+            borderRadius: "6px",
+            padding: "8px 14px",
+            fontSize: "13px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px"
+          }}
+        >
+          🚪 Logout
+        </button>
+
+        <LiveDateTime />
+
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            backgroundColor: "#0d3b66",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "6px",
+            padding: "8px 14px",
+            fontSize: "13px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px"
+          }}
+        >
+          ⬅️ Back to Dashboard
+        </button>
+      </div>
+
+      {/* Title Banner */}
       <div
         style={{
-          backgroundColor: "#0c4a6e",
+          backgroundColor: "#0d3b66",
           color: "#ffffff",
           padding: "16px",
           borderRadius: "8px",
@@ -175,7 +239,7 @@ export default function TagMap({ onBack }) {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h4 style={{ margin: 0, color: "#0c4a6e", display: "flex", alignItems: "center", gap: "6px", fontSize: "16px" }}>
+          <h4 style={{ margin: 0, color: "#0d3b66", display: "flex", alignItems: "center", gap: "6px", fontSize: "16px" }}>
             <span style={{ fontSize: "18px" }}>{editingId ? "✏️" : "➕"}</span>
             {editingId ? "Edit TagMap Update" : "Add TagMap Update"}
           </h4>
@@ -273,7 +337,7 @@ export default function TagMap({ onBack }) {
               type="submit"
               disabled={submitting}
               style={{
-                backgroundColor: "#0284c7",
+                backgroundColor: "#0d3b66",
                 color: "#ffffff",
                 border: "none",
                 padding: "10px 24px",
@@ -362,7 +426,7 @@ export default function TagMap({ onBack }) {
       >
         <table style={{ width: "100%", minWidth: "620px", borderCollapse: "collapse", textAlign: "left" }}>
           <thead>
-            <tr style={{ backgroundColor: "#0c4a6e", color: "#ffffff", fontSize: "13px" }}>
+            <tr style={{ backgroundColor: "#0d3b66", color: "#ffffff", fontSize: "13px" }}>
               <th style={{ padding: "12px 14px", width: "45px", textAlign: "center" }}>No.</th>
               <th style={{ padding: "12px 14px", width: "110px", whiteSpace: "nowrap" }}>Date</th>
               <th style={{ padding: "12px 14px", width: "140px" }}>Requestor</th>
