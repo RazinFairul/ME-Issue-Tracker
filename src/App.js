@@ -604,7 +604,7 @@ export default function App() {
 
           <div className="menu-card card-create" onClick={() => navigateTo('create')}>
             <div className="card-overlay">
-              <h3>Specify an Issue</h3>
+              <h3>Add New Issue</h3>
             </div>
           </div>
 
