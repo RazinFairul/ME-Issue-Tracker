@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { supabase } from '../supabaseClient';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -27,7 +27,6 @@ const CLASS_COLORS = {
   'UNCLASSIFIED': '#94a3b8'
 };
 
-// Standard baseline groups matching CreateIssue & shop-floor standards
 const DEFAULT_GROUPS = [
   'Assembly Line',
   'Cold Test',
@@ -38,27 +37,27 @@ const DEFAULT_GROUPS = [
   'IT'
 ];
 
-export default function DashboardAnalytics({ onBack, onLogout }) {
+function DashboardAnalyticsComponent({ onBack, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [rawIssues, setRawIssues] = useState([]);
   const [dbMasterGroups, setDbMasterGroups] = useState([]);
   const [dbMasterStations, setDbMasterStations] = useState([]);
   
-  // Navigation sub-tab inside Analytics: 'overview' vs 'resolution_list'
+  // Sub-tab navigation
   const [activeSubTab, setActiveSubTab] = useState('overview');
 
-  // Trigger smooth progress animation for Health Bar on mount/tab change
+  // Trigger animation for Health Breakdown bar on tab switch
   const [animateHealthBar, setAnimateHealthBar] = useState(false);
 
   useEffect(() => {
     if (activeSubTab === 'resolution_list') {
       setAnimateHealthBar(false);
-      const timer = setTimeout(() => setAnimateHealthBar(true), 60);
+      const timer = setTimeout(() => setAnimateHealthBar(true), 80);
       return () => clearTimeout(timer);
     }
   }, [activeSubTab]);
 
-  // Global Header Date & Group Filters
+  // Global Header Filters
   const [filterMode, setFilterMode] = useState('all'); 
   const [timeRange, setTimeRange] = useState('all'); 
   
@@ -66,14 +65,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedWeek, setSelectedWeek] = useState('all');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
-
-  // Global Header Group Filter
   const [selectedGroup, setSelectedGroup] = useState('all');
-
-  // Classification Cross-Filter
   const [selectedClassification, setSelectedClassification] = useState(null);
 
-  // In-Table Filters for Resolution Tracker
+  // In-Table Filters
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [listStatusFilter, setListStatusFilter] = useState('all');
   const [listGroupFilter, setListGroupFilter] = useState('all');
@@ -89,7 +84,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const [agingData, setAgingData] = useState([]);
   const [showAllLocations, setShowAllLocations] = useState(false);
 
-  // HOD Executive Metrics: Lead Time & Delay
   const [hodSummary, setHodSummary] = useState({
     avgActualDays: 0,
     avgTargetDays: 0,
@@ -99,7 +93,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     closedTotal: 0
   });
 
-  // Fetch Master Data from Stations and Issues table
   useEffect(() => {
     async function loadAllData() {
       setLoading(true);
@@ -177,14 +170,12 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     return dateStr;
   };
 
-  // Dynamically assemble all available groups (Baseline + Master DB + Issues DB)
   const availableGroupsList = useMemo(() => {
     const fromIssues = rawIssues.map((i) => i.group_name).filter(Boolean);
     const combined = [...DEFAULT_GROUPS, ...dbMasterGroups, ...fromIssues];
     return Array.from(new Set(combined)).sort();
   }, [rawIssues, dbMasterGroups]);
 
-  // Filtered dataset based on header filters
   const dateAndGroupFiltered = useMemo(() => {
     const now = new Date();
     return rawIssues.filter((item) => {
@@ -232,7 +223,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [rawIssues, selectedGroup, filterMode, timeRange, selectedMonth, selectedWeek, selectedYear]);
 
-  // Individual issue resolution metrics calculation
   const individualIssueMetrics = useMemo(() => {
     const now = new Date();
 
@@ -283,7 +273,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [dateAndGroupFiltered]);
 
-  // Dynamic unique lists for in-table filter dropdowns
   const uniqueReporters = useMemo(() => {
     const names = individualIssueMetrics
       .map((i) => i.reporterName)
@@ -482,26 +471,21 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     processDashboard();
   }, [processDashboard]);
 
-  // Filtered issues specifically for the Resolution List Page
   const filteredIndividualIssues = useMemo(() => {
     return individualIssueMetrics.filter((item) => {
-      // 1. Group Filter (In-table)
       if (listGroupFilter !== 'all') {
         const itemGrp = (item.group_name || '').trim().toLowerCase();
         if (itemGrp !== listGroupFilter.trim().toLowerCase()) return false;
       }
 
-      // 2. Reporter Filter (In-table)
       if (listReporterFilter !== 'all') {
         if (item.reporterName !== listReporterFilter) return false;
       }
 
-      // 3. Station Filter (In-table)
       if (listStationFilter !== 'all') {
         if (item.stationName !== listStationFilter) return false;
       }
 
-      // 4. Status Filter (In-table)
       if (listStatusFilter === 'closed_ontime' && item.statusCategory !== 'Resolved (On-Time)') return false;
       if (listStatusFilter === 'closed_delayed' && item.statusCategory !== 'Resolved (Delayed)') return false;
       if (listStatusFilter === 'active_overdue' && item.statusCategory !== 'Overdue (Active)') return false;
@@ -509,7 +493,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       if (listStatusFilter === 'all_closed' && !item.isDone) return false;
       if (listStatusFilter === 'all_active' && item.isDone) return false;
 
-      // 5. Search Query
       const q = listSearchQuery.toLowerCase().trim();
       if (!q) return true;
 
@@ -524,7 +507,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [individualIssueMetrics, listSearchQuery, listStatusFilter, listGroupFilter, listReporterFilter, listStationFilter]);
 
-  // Health breakdown ratio with highlighted percentages
   const healthRatioData = useMemo(() => {
     let onTimeCount = 0;
     let delayedClosedCount = 0;
@@ -592,7 +574,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
   const displayedLocationData = showAllLocations ? locationData : locationData.slice(0, 20);
   const chartWidth = showAllLocations ? Math.max(1000, locationData.length * 45) : '100%';
-  const closeRate = stats.total > 0 ? ((stats.closed / stats.total) * 100).toFixed(1) : 0;
   const maxAxisValue = Math.max(stats.total, 1);
   const totalActiveBacklog = stats.inProgress;
 
@@ -606,9 +587,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
           <small style={{ opacity: 0.85, fontSize: '12px' }}>Manufacturing Engineering Executive Performance & Issue Tracking</small>
         </div>
         
-        {/* Dropdown Filters (Synchronized with Available Groups) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          
           <select
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
@@ -777,13 +756,11 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
             </div>
           </div>
 
-          {/* =========================================================
-             VIEW 1: OVERVIEW & CHARTS
-             ========================================================= */}
+          {/* VIEW 1: OVERVIEW & CHARTS */}
           {activeSubTab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               
-              {/* Row 1: Status ComposedChart & Classification PieChart */}
+              {/* Row 1: Issue Status Chart with Static Labels (No Blinking) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
                 
                 <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
@@ -792,7 +769,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   </h3>
                   <div style={{ width: '100%', height: '280px' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart key="composed-status-chart" data={statusComboData} margin={{ top: 35, right: 20, left: -10, bottom: 5 }}>
+                      <ComposedChart data={statusComboData} margin={{ top: 35, right: 20, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="status" tick={{ fontWeight: 'bold', fontSize: 12 }} />
                         <YAxis yAxisId="left" allowDecimals={false} domain={[0, maxAxisValue]} />
@@ -805,16 +782,14 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           ]} 
                         />
 
-                        {/* Bar with smooth entry animation & flicker-free Center Label */}
+                        {/* Static Bars without continuous re-render flicker */}
                         <Bar 
                           yAxisId="left" 
                           dataKey="count" 
                           name="Count"
                           barSize={46}
                           radius={[4, 4, 0, 0]}
-                          isAnimationActive={true}
-                          animationDuration={900}
-                          animationEasing="ease-out"
+                          isAnimationActive={false}
                         >
                           {statusComboData.map((entry, idx) => (
                             <Cell key={`bar-cell-${idx}`} fill={entry.fill} />
@@ -823,11 +798,11 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                             dataKey="count" 
                             position="center" 
                             fill="#ffffff" 
-                            style={{ fontSize: '13px', fontWeight: 'bold', pointerEvents: 'none' }} 
+                            style={{ fontSize: '13px', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none' }} 
                           />
                         </Bar>
 
-                        {/* Line with smooth entry animation & flicker-free Top Label */}
+                        {/* Static Line without continuous re-render flicker */}
                         <Line 
                           yAxisId="left" 
                           type="linear" 
@@ -836,16 +811,14 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           stroke="#b91c1c" 
                           strokeWidth={3} 
                           dot={{ r: 5, fill: '#b91c1c' }}
-                          isAnimationActive={true}
-                          animationDuration={900}
-                          animationEasing="ease-out"
+                          isAnimationActive={false}
                         >
                           <LabelList 
                             dataKey="displayPercent" 
                             position="top" 
                             offset={12}
                             fill="#b91c1c" 
-                            style={{ fontSize: '12px', fontWeight: 'bold', pointerEvents: 'none' }} 
+                            style={{ fontSize: '12px', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none' }} 
                           />
                         </Line>
                       </ComposedChart>
@@ -875,8 +848,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                             paddingAngle={2}
                             dataKey="value"
                             labelLine={true}
-                            isAnimationActive={true}
-                            animationDuration={800}
+                            isAnimationActive={false}
                             label={renderCustomPercentageLabel}
                             cursor="pointer"
                             onClick={(entry) => setSelectedClassification((prev) => prev === entry.name ? null : entry.name)}
@@ -916,8 +888,8 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         <YAxis allowDecimals={false} />
                         <Tooltip />
                         <Legend />
-                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={true} animationDuration={800} />
-                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={true} animationDuration={800} />
+                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -965,8 +937,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               paddingAngle={3}
                               dataKey="count"
                               labelLine={true}
-                              isAnimationActive={true}
-                              animationDuration={800}
+                              isAnimationActive={false}
                               label={renderAgingPercentageLabel}
                             >
                               {agingData.map((entry, idx) => (
@@ -1018,7 +989,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         <XAxis dataKey="location" interval={0} angle={-30} textAnchor="end" height={50} />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={800} />
+                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1028,14 +999,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
             </div>
           )}
 
-          {/* =========================================================
-             VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
-             Clean Multi-Filter Table + Smooth Animated Health Bar
-             ========================================================= */}
+          {/* VIEW 2: ISSUE RESOLUTION & DELAY TRACKER (ANIMATED HEALTH BAR) */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
               
-              {/* Header Title & Multi-Filter Control */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '18px' }}>
@@ -1047,7 +1014,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* Search Input */}
                   <input
                     type="text"
                     placeholder="Search..."
@@ -1063,7 +1029,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     }}
                   />
 
-                  {/* 1. Group Filter (In-Table) */}
                   <select
                     value={listGroupFilter}
                     onChange={(e) => setListGroupFilter(e.target.value)}
@@ -1086,7 +1051,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     ))}
                   </select>
 
-                  {/* 2. Reporter Filter (In-Table) */}
                   <select
                     value={listReporterFilter}
                     onChange={(e) => setListReporterFilter(e.target.value)}
@@ -1109,7 +1073,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     ))}
                   </select>
 
-                  {/* 3. Station Filter (In-Table) */}
                   <select
                     value={listStationFilter}
                     onChange={(e) => setListStationFilter(e.target.value)}
@@ -1132,7 +1095,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     ))}
                   </select>
 
-                  {/* 4. Status Filter */}
                   <select
                     value={listStatusFilter}
                     onChange={(e) => setListStatusFilter(e.target.value)}
@@ -1158,7 +1120,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
               </div>
 
-              {/* Scalable Visual Tracker: Smooth Animated Health Bar */}
+              {/* Smooth Animated Horizontal Health Ratio Progress Bar */}
               <div style={{ backgroundColor: '#f8fafc', padding: '16px 20px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
                   <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0d3b66' }}>
@@ -1169,7 +1131,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   </span>
                 </div>
 
-                {/* Animated Horizontal Progress Bar with Spring Easing */}
                 <div style={{ display: 'flex', width: '100%', height: '14px', borderRadius: '7px', overflow: 'hidden', backgroundColor: '#e2e8f0', marginBottom: '14px' }}>
                   {healthRatioData.map((item, idx) => {
                     if (item.percent === 0) return null;
@@ -1188,7 +1149,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   })}
                 </div>
 
-                {/* Highlighted Percentage Cards with Staggered Fade-in */}
+                {/* Staggered Animated Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
                   {healthRatioData.map((item, idx) => (
                     <div
@@ -1256,12 +1217,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               borderBottom: '1px solid #e2e8f0'
                             }}
                           >
-                            {/* 1. Number */}
                             <td style={{ padding: '12px 10px', color: '#64748b', fontWeight: 'bold' }}>
                               {index + 1}
                             </td>
                             
-                            {/* 2. Issue Details with Loc and Class on separate lines */}
                             <td style={{ padding: '12px 10px', maxWidth: '240px' }}>
                               <div style={{ fontWeight: 'bold', color: '#0d3b66', marginBottom: '2px' }}>
                                 {item.what_issue || 'Untitled Issue'}
@@ -1280,14 +1239,12 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               </div>
                             </td>
 
-                            {/* 3. Reported By */}
                             <td style={{ padding: '12px 10px' }} className="notranslate" translate="no">
                               <div style={{ fontWeight: '600', color: '#0d3b66' }}>
                                 {item.reporterName}
                               </div>
                             </td>
 
-                            {/* 4. Group / PIC */}
                             <td style={{ padding: '12px 10px' }} className="notranslate" translate="no">
                               <div style={{ fontWeight: 'bold', color: '#1e293b' }}>
                                 {item.group_name || '-'}
@@ -1297,12 +1254,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               </div>
                             </td>
 
-                            {/* 5. Date Open */}
                             <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                               {formatDateOnlyDisplay(item.openDateRaw)}
                             </td>
 
-                            {/* 6. Target Est. Closing */}
                             <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                               {item.estDateRaw ? formatDateOnlyDisplay(item.estDateRaw) : <span style={{ color: '#94a3b8' }}>Not specified</span>}
                               {item.targetDays !== null && (
@@ -1312,7 +1267,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               )}
                             </td>
 
-                            {/* 7. Date Closed */}
                             <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
                               {isResolved ? (
                                 <span style={{ color: '#15803d', fontWeight: '600' }}>
@@ -1325,7 +1279,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               )}
                             </td>
 
-                            {/* 8. Lead Time */}
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <div style={{ fontWeight: 'bold', color: isResolved ? '#15803d' : '#0369a1', fontSize: '13px' }}>
                                 {item.actualDays} <span style={{ fontSize: '11px' }}>Days</span>
@@ -1335,7 +1288,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               </div>
                             </td>
 
-                            {/* 9. Delay Variance */}
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               {isDelayed ? (
                                 <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
@@ -1348,7 +1300,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               )}
                             </td>
 
-                            {/* 10. Status */}
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <span
                                 style={{
@@ -1387,3 +1338,5 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     </div>
   );
 }
+
+export default memo(DashboardAnalyticsComponent);
