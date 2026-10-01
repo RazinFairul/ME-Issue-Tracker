@@ -42,15 +42,17 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const [selectedWeek, setSelectedWeek] = useState('all');
   const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
 
-  // Group Filter
+  // Global Header Group Filter
   const [selectedGroup, setSelectedGroup] = useState('all');
 
   // Classification Cross-Filter
   const [selectedClassification, setSelectedClassification] = useState(null);
 
-  // Resolution List Search & Status Filter
+  // In-Table Filters for Resolution Tracker
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [listStatusFilter, setListStatusFilter] = useState('all');
+  const [listGroupFilter, setListGroupFilter] = useState('all');
+  const [listReporterFilter, setListReporterFilter] = useState('all');
 
   // Display States
   const [stats, setStats] = useState({ total: 0, inProgress: 0, closed: 0 });
@@ -231,6 +233,21 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       };
     });
   }, [dateAndGroupFiltered]);
+
+  // Dynamic unique reporters & groups for table filter dropdowns
+  const uniqueReporters = useMemo(() => {
+    const names = individualIssueMetrics
+      .map((i) => i.reporterName)
+      .filter((n) => n && n !== '-');
+    return Array.from(new Set(names)).sort();
+  }, [individualIssueMetrics]);
+
+  const uniqueGroups = useMemo(() => {
+    const groups = individualIssueMetrics
+      .map((i) => i.group_name)
+      .filter((g) => g && g !== '-');
+    return Array.from(new Set(groups)).sort();
+  }, [individualIssueMetrics]);
 
   const processDashboard = useCallback(() => {
     if (!dateAndGroupFiltered.length) {
@@ -420,47 +437,39 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   // Filtered issues specifically for the Resolution List Page
   const filteredIndividualIssues = useMemo(() => {
     return individualIssueMetrics.filter((item) => {
+      // 1. Group Filter (In-table)
+      if (listGroupFilter !== 'all') {
+        const itemGrp = (item.group_name || '').trim().toLowerCase();
+        if (itemGrp !== listGroupFilter.trim().toLowerCase()) return false;
+      }
+
+      // 2. Reporter Filter (In-table)
+      if (listReporterFilter !== 'all') {
+        if (item.reporterName !== listReporterFilter) return false;
+      }
+
+      // 3. Status Filter (In-table)
+      if (listStatusFilter === 'closed_ontime' && item.statusCategory !== 'Resolved (On-Time)') return false;
+      if (listStatusFilter === 'closed_delayed' && item.statusCategory !== 'Resolved (Delayed)') return false;
+      if (listStatusFilter === 'active_overdue' && item.statusCategory !== 'Overdue (Active)') return false;
+      if (listStatusFilter === 'active_ontrack' && item.statusCategory !== 'On Track (Open)') return false;
+      if (listStatusFilter === 'all_closed' && !item.isDone) return false;
+      if (listStatusFilter === 'all_active' && item.isDone) return false;
+
+      // 4. Search Query
       const q = listSearchQuery.toLowerCase();
-      const matchSearch =
-        !q ||
+      if (!q) return true;
+
+      return (
         (item.what_issue && item.what_issue.toLowerCase().includes(q)) ||
         (item.group_name && item.group_name.toLowerCase().includes(q)) ||
         (item.location && item.location.toLowerCase().includes(q)) ||
         (item.reporterName && item.reporterName.toLowerCase().includes(q)) ||
         (item.pic_name && item.pic_name.toLowerCase().includes(q)) ||
-        (item.pic && item.pic.toLowerCase().includes(q));
-
-      if (!matchSearch) return false;
-
-      if (listStatusFilter === 'closed_ontime') return item.statusCategory === 'Resolved (On-Time)';
-      if (listStatusFilter === 'closed_delayed') return item.statusCategory === 'Resolved (Delayed)';
-      if (listStatusFilter === 'active_overdue') return item.statusCategory === 'Overdue (Active)';
-      if (listStatusFilter === 'active_ontrack') return item.statusCategory === 'On Track (Open)';
-      if (listStatusFilter === 'all_closed') return item.isDone;
-      if (listStatusFilter === 'all_active') return !item.isDone;
-
-      return true;
+        (item.pic && item.pic.toLowerCase().includes(q))
+      );
     });
-  }, [individualIssueMetrics, listSearchQuery, listStatusFilter]);
-
-  // Data per-isu untuk graf Target vs Actual (By Issue)
-  const chartDataByIssue = useMemo(() => {
-    return filteredIndividualIssues.slice(0, 15).map((item) => {
-      const shortTitle = item.what_issue && item.what_issue.length > 18 
-        ? `${item.what_issue.substring(0, 16)}...` 
-        : (item.what_issue || 'Issue');
-
-      return {
-        id: item.id,
-        issueTitle: shortTitle,
-        fullTitle: item.what_issue,
-        'Target Days': item.targetDays || 0,
-        'Actual Days': item.actualDays || 0,
-        delayDays: item.delayDays > 0 ? item.delayDays : 0,
-        status: item.statusCategory
-      };
-    });
-  }, [filteredIndividualIssues]);
+  }, [individualIssueMetrics, listSearchQuery, listStatusFilter, listGroupFilter, listReporterFilter]);
 
   const renderCustomPercentageLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
     if (!value || percent === 0) return null;
@@ -956,26 +965,27 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           {/* =========================================================
              VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
-             Clean Header (No Icons), Date-Only, Reported By, Multi-line Loc/Class
+             Clean Table with In-Table Filter for Group, Reporter & Status
              ========================================================= */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
               
-              {/* Header Title & In-Table Filters */}
+              {/* Header Title & Multi-Filter Control */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '18px' }}>
                     Individual Issue Resolution & Delay Tracker
                   </h3>
                   <small style={{ color: '#64748b' }}>
-                    Tracks baseline dates, closed dates, lead time durations, and delay variance per issue
+                    Filterable record tracker for exact baseline dates, resolution durations, and delay variance
                   </small>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Search Input */}
                   <input
                     type="text"
-                    placeholder="Search title, reporter, PIC, location..."
+                    placeholder="Search title, location, PIC..."
                     value={listSearchQuery}
                     onChange={(e) => setListSearchQuery(e.target.value)}
                     style={{
@@ -983,11 +993,58 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                       borderRadius: '5px',
                       border: '1px solid #cbd5e1',
                       fontSize: '12px',
-                      width: '240px',
+                      width: '200px',
                       outline: 'none'
                     }}
                   />
 
+                  {/* 1. Group Filter (In-Table) */}
+                  <select
+                    value={listGroupFilter}
+                    onChange={(e) => setListGroupFilter(e.target.value)}
+                    className="notranslate"
+                    translate="no"
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#0d3b66',
+                      backgroundColor: '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">All Groups</option>
+                    {uniqueGroups.map((grp) => (
+                      <option key={grp} value={grp}>{grp}</option>
+                    ))}
+                  </select>
+
+                  {/* 2. Reporter Filter (In-Table) */}
+                  <select
+                    value={listReporterFilter}
+                    onChange={(e) => setListReporterFilter(e.target.value)}
+                    className="notranslate"
+                    translate="no"
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#0d3b66',
+                      backgroundColor: '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">All Reporters</option>
+                    {uniqueReporters.map((rep) => (
+                      <option key={rep} value={rep}>{rep}</option>
+                    ))}
+                  </select>
+
+                  {/* 3. Status Filter */}
                   <select
                     value={listStatusFilter}
                     onChange={(e) => setListStatusFilter(e.target.value)}
@@ -1002,7 +1059,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                       cursor: 'pointer'
                     }}
                   >
-                    <option value="all">All Records ({individualIssueMetrics.length})</option>
+                    <option value="all">All Records ({filteredIndividualIssues.length})</option>
                     <option value="closed_ontime">Resolved (On-Time)</option>
                     <option value="closed_delayed">Resolved (Delayed)</option>
                     <option value="active_overdue">Active Overdue</option>
@@ -1012,38 +1069,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   </select>
                 </div>
               </div>
-
-              {/* Cadangan Graf Khusus untuk Isu Individu: Target vs Actual Days by Issue */}
-              {chartDataByIssue.length > 0 && (
-                <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
-                    <h4 style={{ margin: 0, fontSize: '13px', color: '#0d3b66' }}>
-                      📊 Planned Target vs Actual Days per Issue (Top {chartDataByIssue.length} shown)
-                    </h4>
-                    <span style={{ fontSize: '10px', color: '#64748b', fontStyle: 'italic' }}>
-                      *Bar Oren/Merah melebihi Bar Biru menandakan isu tersebut lewat (*delayed*)
-                    </span>
-                  </div>
-
-                  <div style={{ width: '100%', height: '230px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={chartDataByIssue} margin={{ top: 10, right: 20, left: -10, bottom: 25 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="issueTitle" interval={0} angle={-20} textAnchor="end" height={40} tick={{ fontSize: 10 }} />
-                        <YAxis allowDecimals={false} unit=" d" tick={{ fontSize: 11 }} />
-                        <Tooltip 
-                          formatter={(val, name, item) => [`${val} Days`, name === 'Target Days' ? 'Target (Plan)' : 'Actual Duration']}
-                          labelFormatter={(label, item) => item && item[0] ? item[0].payload.fullTitle : label}
-                        />
-                        <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '6px', fontSize: '11px' }} />
-                        <Bar dataKey="Target Days" fill="#0284c7" barSize={18} radius={[3, 3, 0, 0]} name="Target Plan" />
-                        <Bar dataKey="Actual Days" fill="#f97316" barSize={18} radius={[3, 3, 0, 0]} name="Actual Duration" />
-                        <Line type="monotone" dataKey="delayDays" stroke="#dc2626" strokeWidth={2} name="Delay (+Days)" dot={{ r: 4, fill: '#dc2626' }} />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
 
               {/* Resolution Table */}
               {filteredIndividualIssues.length === 0 ? (
@@ -1085,7 +1110,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               {index + 1}
                             </td>
                             
-                            {/* 2. Issue Details (Loc & Class ke bawah) */}
+                            {/* 2. Issue Details with Loc and Class on separate lines */}
                             <td style={{ padding: '12px 10px', maxWidth: '240px' }}>
                               <div style={{ fontWeight: 'bold', color: '#0d3b66', marginBottom: '2px' }}>
                                 {item.what_issue || 'Untitled Issue'}
@@ -1104,7 +1129,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               </div>
                             </td>
 
-                            {/* 3. Reported By (Nama) */}
+                            {/* 3. Reported By */}
                             <td style={{ padding: '12px 10px' }} className="notranslate" translate="no">
                               <div style={{ fontWeight: '600', color: '#0d3b66' }}>
                                 {item.reporterName}
