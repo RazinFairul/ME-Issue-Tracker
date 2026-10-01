@@ -124,7 +124,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     }
   };
 
-  // Helper untuk paparan tarikh sahaja (DD/MM/YY) tanpa masa
   const formatDateOnlyDisplay = (dateStr) => {
     if (!dateStr) return '-';
     const clean = dateStr.split('T')[0].split(' ')[0];
@@ -443,6 +442,25 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       return true;
     });
   }, [individualIssueMetrics, listSearchQuery, listStatusFilter]);
+
+  // Data per-isu untuk graf Target vs Actual (By Issue)
+  const chartDataByIssue = useMemo(() => {
+    return filteredIndividualIssues.slice(0, 15).map((item) => {
+      const shortTitle = item.what_issue && item.what_issue.length > 18 
+        ? `${item.what_issue.substring(0, 16)}...` 
+        : (item.what_issue || 'Issue');
+
+      return {
+        id: item.id,
+        issueTitle: shortTitle,
+        fullTitle: item.what_issue,
+        'Target Days': item.targetDays || 0,
+        'Actual Days': item.actualDays || 0,
+        delayDays: item.delayDays > 0 ? item.delayDays : 0,
+        status: item.statusCategory
+      };
+    });
+  }, [filteredIndividualIssues]);
 
   const renderCustomPercentageLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
     if (!value || percent === 0) return null;
@@ -938,7 +956,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           {/* =========================================================
              VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
-             Clean Header (No Icons), Date-Only (No Time), Reported By Included
+             Clean Header (No Icons), Date-Only, Reported By, Multi-line Loc/Class
              ========================================================= */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -995,6 +1013,38 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
               </div>
 
+              {/* Cadangan Graf Khusus untuk Isu Individu: Target vs Actual Days by Issue */}
+              {chartDataByIssue.length > 0 && (
+                <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
+                    <h4 style={{ margin: 0, fontSize: '13px', color: '#0d3b66' }}>
+                      📊 Planned Target vs Actual Days per Issue (Top {chartDataByIssue.length} shown)
+                    </h4>
+                    <span style={{ fontSize: '10px', color: '#64748b', fontStyle: 'italic' }}>
+                      *Bar Oren/Merah melebihi Bar Biru menandakan isu tersebut lewat (*delayed*)
+                    </span>
+                  </div>
+
+                  <div style={{ width: '100%', height: '230px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={chartDataByIssue} margin={{ top: 10, right: 20, left: -10, bottom: 25 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="issueTitle" interval={0} angle={-20} textAnchor="end" height={40} tick={{ fontSize: 10 }} />
+                        <YAxis allowDecimals={false} unit=" d" tick={{ fontSize: 11 }} />
+                        <Tooltip 
+                          formatter={(val, name, item) => [`${val} Days`, name === 'Target Days' ? 'Target (Plan)' : 'Actual Duration']}
+                          labelFormatter={(label, item) => item && item[0] ? item[0].payload.fullTitle : label}
+                        />
+                        <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '6px', fontSize: '11px' }} />
+                        <Bar dataKey="Target Days" fill="#0284c7" barSize={18} radius={[3, 3, 0, 0]} name="Target Plan" />
+                        <Bar dataKey="Actual Days" fill="#f97316" barSize={18} radius={[3, 3, 0, 0]} name="Actual Duration" />
+                        <Line type="monotone" dataKey="delayDays" stroke="#dc2626" strokeWidth={2} name="Delay (+Days)" dot={{ r: 4, fill: '#dc2626' }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
               {/* Resolution Table */}
               {filteredIndividualIssues.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
@@ -1035,13 +1085,22 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               {index + 1}
                             </td>
                             
-                            {/* 2. Issue Details */}
+                            {/* 2. Issue Details (Loc & Class ke bawah) */}
                             <td style={{ padding: '12px 10px', maxWidth: '240px' }}>
                               <div style={{ fontWeight: 'bold', color: '#0d3b66', marginBottom: '2px' }}>
                                 {item.what_issue || 'Untitled Issue'}
                               </div>
-                              <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                {item.location ? `Loc: ${item.location}` : ''} {item.classification ? `• Class ${item.classification}` : ''}
+                              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px', lineHeight: 1.4 }}>
+                                {item.location && (
+                                  <div>
+                                    Loc: <span className="notranslate" translate="no">{item.location}</span>
+                                  </div>
+                                )}
+                                {item.classification && (
+                                  <div>
+                                    Class {item.classification}
+                                  </div>
+                                )}
                               </div>
                             </td>
 
@@ -1062,12 +1121,12 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               </div>
                             </td>
 
-                            {/* 5. Date Open (Tarikh Sahaja Tanpa Masa) */}
+                            {/* 5. Date Open */}
                             <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                               {formatDateOnlyDisplay(item.openDateRaw)}
                             </td>
 
-                            {/* 6. Target Est. Closing (Tarikh Sahaja) */}
+                            {/* 6. Target Est. Closing */}
                             <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                               {item.estDateRaw ? formatDateOnlyDisplay(item.estDateRaw) : <span style={{ color: '#94a3b8' }}>Not specified</span>}
                               {item.targetDays !== null && (
@@ -1077,7 +1136,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               )}
                             </td>
 
-                            {/* 7. Date Closed (Tarikh Sahaja Tanpa Masa) */}
+                            {/* 7. Date Closed */}
                             <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
                               {isResolved ? (
                                 <span style={{ color: '#15803d', fontWeight: '600' }}>
