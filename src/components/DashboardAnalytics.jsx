@@ -4,7 +4,8 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
   LineChart,
-  BarChart
+  BarChart,
+  LabelList
 } from 'recharts';
 
 const MONTHS = [
@@ -45,6 +46,17 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   
   // Navigation sub-tab inside Analytics: 'overview' vs 'resolution_list'
   const [activeSubTab, setActiveSubTab] = useState('overview');
+
+  // Trigger smooth progress animation for Health Bar on mount/tab change
+  const [animateHealthBar, setAnimateHealthBar] = useState(false);
+
+  useEffect(() => {
+    if (activeSubTab === 'resolution_list') {
+      setAnimateHealthBar(false);
+      const timer = setTimeout(() => setAnimateHealthBar(true), 60);
+      return () => clearTimeout(timer);
+    }
+  }, [activeSubTab]);
 
   // Global Header Date & Group Filters
   const [filterMode, setFilterMode] = useState('all'); 
@@ -429,9 +441,9 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     const inProgressPercent = totalCount > 0 ? Math.round((inProgressCount / totalCount) * 100) : 0;
 
     setStatusComboData([
-      { status: 'Total', count: totalCount, percentage: 100, fill: '#0d3b66' },
-      { status: 'Closed', count: closedCount, percentage: closedPercent, fill: '#16a34a' },
-      { status: 'Ongoing', count: inProgressCount, percentage: inProgressPercent, fill: '#ea580c' }
+      { status: 'Total', count: totalCount, percentage: 100, displayPercent: '100%', fill: '#0d3b66' },
+      { status: 'Closed', count: closedCount, percentage: closedPercent, displayPercent: `${closedPercent}%`, fill: '#16a34a' },
+      { status: 'Ongoing', count: inProgressCount, percentage: inProgressPercent, displayPercent: `${inProgressPercent}%`, fill: '#ea580c' }
     ]);
 
     setClassificationData(
@@ -574,42 +586,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         style={{ fontSize: '11px', fontWeight: 'bold' }}
       >
         {`${(percent * 100).toFixed(0)}% (${value})`}
-      </text>
-    );
-  };
-
-  // Smooth, non-flickering label inside the bar
-  const renderInsideBarLabel = (props) => {
-    const { x, y, width, height, value } = props;
-    if (!value || height < 16) return null;
-    return (
-      <text
-        x={x + width / 2}
-        y={y + height / 2}
-        fill="#ffffff"
-        textAnchor="middle"
-        dominantBaseline="middle"
-        style={{ fontSize: '13px', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {value}
-      </text>
-    );
-  };
-
-  // Smooth, non-flickering line percentage label
-  const renderLinePercentageLabel = (props) => {
-    const { x, y, index } = props;
-    const percent = statusComboData[index]?.percentage;
-    if (percent === undefined || percent === null) return null;
-    return (
-      <text
-        x={x}
-        y={y - 12}
-        fill="#b91c1c"
-        textAnchor="middle"
-        style={{ fontSize: '12px', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {`${percent}%`}
       </text>
     );
   };
@@ -816,7 +792,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   </h3>
                   <div style={{ width: '100%', height: '280px' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={statusComboData} margin={{ top: 35, right: 20, left: -10, bottom: 5 }}>
+                      <ComposedChart key="composed-status-chart" data={statusComboData} margin={{ top: 35, right: 20, left: -10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="status" tick={{ fontWeight: 'bold', fontSize: 12 }} />
                         <YAxis yAxisId="left" allowDecimals={false} domain={[0, maxAxisValue]} />
@@ -829,7 +805,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           ]} 
                         />
 
-                        {/* Smooth active animation with flicker-free stable label */}
+                        {/* Bar with smooth entry animation & flicker-free Center Label */}
                         <Bar 
                           yAxisId="left" 
                           dataKey="count" 
@@ -837,15 +813,21 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           barSize={46}
                           radius={[4, 4, 0, 0]}
                           isAnimationActive={true}
-                          animationDuration={800}
+                          animationDuration={900}
                           animationEasing="ease-out"
-                          label={renderInsideBarLabel}
                         >
                           {statusComboData.map((entry, idx) => (
                             <Cell key={`bar-cell-${idx}`} fill={entry.fill} />
                           ))}
+                          <LabelList 
+                            dataKey="count" 
+                            position="center" 
+                            fill="#ffffff" 
+                            style={{ fontSize: '13px', fontWeight: 'bold', pointerEvents: 'none' }} 
+                          />
                         </Bar>
 
+                        {/* Line with smooth entry animation & flicker-free Top Label */}
                         <Line 
                           yAxisId="left" 
                           type="linear" 
@@ -855,10 +837,17 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           strokeWidth={3} 
                           dot={{ r: 5, fill: '#b91c1c' }}
                           isAnimationActive={true}
-                          animationDuration={800}
+                          animationDuration={900}
                           animationEasing="ease-out"
-                          label={renderLinePercentageLabel}
-                        />
+                        >
+                          <LabelList 
+                            dataKey="displayPercent" 
+                            position="top" 
+                            offset={12}
+                            fill="#b91c1c" 
+                            style={{ fontSize: '12px', fontWeight: 'bold', pointerEvents: 'none' }} 
+                          />
+                        </Line>
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
@@ -868,7 +857,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
                     <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
-                      🏷️️ Classification (Click slice to cross-filter)
+                      🏷️ Classification (Click slice to cross-filter)
                     </h3>
                   </div>
                   <div style={{ width: '100%', height: '280px' }}>
@@ -1041,7 +1030,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           {/* =========================================================
              VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
-             Clean Multi-Filter Table + Highlighted Percentage Ratio Bar
+             Clean Multi-Filter Table + Smooth Animated Health Bar
              ========================================================= */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -1169,7 +1158,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
               </div>
 
-              {/* Scalable Visual Tracker: Highlighted Percentage Breakdown */}
+              {/* Scalable Visual Tracker: Smooth Animated Health Bar */}
               <div style={{ backgroundColor: '#f8fafc', padding: '16px 20px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
                   <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0d3b66' }}>
@@ -1180,17 +1169,18 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   </span>
                 </div>
 
-                {/* Horizontal Composition Progress Bar */}
-                <div style={{ display: 'flex', width: '100%', height: '14px', borderRadius: '7px', overflow: 'hidden', backgroundColor: '#e2e8f0', marginBottom: '12px' }}>
+                {/* Animated Horizontal Progress Bar with Spring Easing */}
+                <div style={{ display: 'flex', width: '100%', height: '14px', borderRadius: '7px', overflow: 'hidden', backgroundColor: '#e2e8f0', marginBottom: '14px' }}>
                   {healthRatioData.map((item, idx) => {
                     if (item.percent === 0) return null;
                     return (
                       <div
                         key={`ratio-bar-${idx}`}
                         style={{
-                          width: `${item.percent}%`,
+                          width: animateHealthBar ? `${item.percent}%` : '0%',
                           backgroundColor: item.color,
-                          transition: 'width 0.4s ease'
+                          transition: `width 0.9s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 0.12}s`,
+                          willChange: 'width'
                         }}
                         title={`${item.name}: ${item.percent}% (${item.count} issues)`}
                       />
@@ -1198,7 +1188,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   })}
                 </div>
 
-                {/* Highlighted Percentage Cards */}
+                {/* Highlighted Percentage Cards with Staggered Fade-in */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
                   {healthRatioData.map((item, idx) => (
                     <div
@@ -1210,7 +1200,11 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         padding: '10px 14px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px'
+                        gap: '10px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                        opacity: animateHealthBar ? 1 : 0,
+                        transform: animateHealthBar ? 'translateY(0)' : 'translateY(8px)',
+                        transition: `all 0.5s ease-out ${idx * 0.1}s`
                       }}
                     >
                       <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: item.color, flexShrink: 0 }} />
