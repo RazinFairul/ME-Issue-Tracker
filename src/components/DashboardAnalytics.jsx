@@ -709,7 +709,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
             gap: '6px'
           }}
         >
-          <span>⏱️</span> Issue Lead Time & Delay Breakdown ({individualIssueMetrics.length})
+          <span>⏱️</span> Issue Resolution & Delay Tracker
         </button>
       </div>
 
@@ -1012,7 +1012,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '18px' }}>
-                    Individual Issue Resolution & Delay Tracker
+                    Issue Resolution & Delay Tracker
                   </h3>
                   <small style={{ color: '#64748b' }}>
                     Filterable record tracker for exact baseline dates, resolution durations, and delay variance
