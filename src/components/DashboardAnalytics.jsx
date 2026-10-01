@@ -124,25 +124,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     }
   };
 
-  const formatDateTimeDisplay = (dateStr) => {
-    if (!dateStr) return '-';
-    const cleanStr = dateStr.replace('T', ' ');
-    const [datePart, timePart] = cleanStr.split(' ');
-    if (datePart && datePart.includes('-')) {
-      const [year, month, day] = datePart.split('-');
-      let formattedTime = '';
-      if (timePart) {
-        const [h, m] = timePart.split(':');
-        const hour = parseInt(h, 10);
-        if (!isNaN(hour)) {
-          formattedTime = `, ${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
-        }
-      }
-      return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}${formattedTime}`;
-    }
-    return dateStr;
-  };
-
+  // Helper untuk paparan tarikh sahaja (DD/MM/YY) tanpa masa
   const formatDateOnlyDisplay = (dateStr) => {
     if (!dateStr) return '-';
     const clean = dateStr.split('T')[0].split(' ')[0];
@@ -228,7 +210,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
           }
           statusCategory = delayDays > 0 ? 'Resolved (Delayed)' : 'Resolved (On-Time)';
         } else {
-          // Open issue running duration
           actualDays = Math.max(0, Math.round((now - openDate) / (1000 * 60 * 60 * 24)));
           if (estCloseDate && now > estCloseDate) {
             delayDays = Math.round((now - estCloseDate) / (1000 * 60 * 60 * 24));
@@ -243,6 +224,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         openDateRaw: issue.date_time || issue.created_at,
         closedDateRaw: isDone ? (issue.updated_at || issue.date_time) : null,
         estDateRaw: issue.estimated_closing,
+        reporterName: issue.staff_name || issue.staff_id || '-',
         actualDays,
         targetDays,
         delayDays,
@@ -445,7 +427,9 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         (item.what_issue && item.what_issue.toLowerCase().includes(q)) ||
         (item.group_name && item.group_name.toLowerCase().includes(q)) ||
         (item.location && item.location.toLowerCase().includes(q)) ||
-        (item.staff_name && item.staff_name.toLowerCase().includes(q));
+        (item.reporterName && item.reporterName.toLowerCase().includes(q)) ||
+        (item.pic_name && item.pic_name.toLowerCase().includes(q)) ||
+        (item.pic && item.pic.toLowerCase().includes(q));
 
       if (!matchSearch) return false;
 
@@ -954,6 +938,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           {/* =========================================================
              VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
+             Clean Header (No Icons), Date-Only (No Time), Reported By Included
              ========================================================= */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -962,17 +947,17 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '18px' }}>
-                    ⏱️ Individual Issue Resolution & Delay Tracker
+                    Individual Issue Resolution & Delay Tracker
                   </h3>
                   <small style={{ color: '#64748b' }}>
-                    Tracks exact open timestamp, baseline target, closed timestamp, and delay variance for each issue
+                    Tracks baseline dates, closed dates, lead time durations, and delay variance per issue
                   </small>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <input
                     type="text"
-                    placeholder="Search issue title, group, PIC..."
+                    placeholder="Search title, reporter, PIC, location..."
                     value={listSearchQuery}
                     onChange={(e) => setListSearchQuery(e.target.value)}
                     style={{
@@ -980,7 +965,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                       borderRadius: '5px',
                       border: '1px solid #cbd5e1',
                       fontSize: '12px',
-                      width: '230px',
+                      width: '240px',
                       outline: 'none'
                     }}
                   />
@@ -1000,12 +985,12 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     }}
                   >
                     <option value="all">All Records ({individualIssueMetrics.length})</option>
-                    <option value="closed_ontime">✅ Resolved On-Time</option>
-                    <option value="closed_delayed">⚠️ Resolved Delayed</option>
-                    <option value="active_overdue">🚨 Active Overdue</option>
-                    <option value="active_ontrack">⏳ Active On Track</option>
-                    <option value="all_closed">⚫ All Closed</option>
-                    <option value="all_active">◑ All Active</option>
+                    <option value="closed_ontime">Resolved (On-Time)</option>
+                    <option value="closed_delayed">Resolved (Delayed)</option>
+                    <option value="active_overdue">Active Overdue</option>
+                    <option value="active_ontrack">Active On Track</option>
+                    <option value="all_closed">All Closed</option>
+                    <option value="all_active">All Active</option>
                   </select>
                 </div>
               </div>
@@ -1020,15 +1005,16 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#0d3b66', color: '#ffffff', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>No.</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>Issue Details</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>Group / PIC</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>📅 Date & Time Open</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>🎯 Target Est. Closing</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>🏁 Date & Time Closed</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Lead Time</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Delay Variance</th>
-                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Status</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>NO.</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>ISSUE DETAILS</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>REPORTED BY</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>GROUP / PIC</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>DATE OPEN</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>TARGET EST. CLOSING</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>DATE CLOSED</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>LEAD TIME</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>DELAY VARIANCE</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>STATUS</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1044,10 +1030,12 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               borderBottom: '1px solid #e2e8f0'
                             }}
                           >
+                            {/* 1. Number */}
                             <td style={{ padding: '12px 10px', color: '#64748b', fontWeight: 'bold' }}>
                               {index + 1}
                             </td>
                             
+                            {/* 2. Issue Details */}
                             <td style={{ padding: '12px 10px', maxWidth: '240px' }}>
                               <div style={{ fontWeight: 'bold', color: '#0d3b66', marginBottom: '2px' }}>
                                 {item.what_issue || 'Untitled Issue'}
@@ -1057,19 +1045,29 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               </div>
                             </td>
 
+                            {/* 3. Reported By (Nama) */}
+                            <td style={{ padding: '12px 10px' }} className="notranslate" translate="no">
+                              <div style={{ fontWeight: '600', color: '#0d3b66' }}>
+                                {item.reporterName}
+                              </div>
+                            </td>
+
+                            {/* 4. Group / PIC */}
                             <td style={{ padding: '12px 10px' }} className="notranslate" translate="no">
                               <div style={{ fontWeight: 'bold', color: '#1e293b' }}>
                                 {item.group_name || '-'}
                               </div>
                               <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                PIC: {item.pic_name || item.pic || item.staff_name || '-'}
+                                PIC: {item.pic_name || item.pic || '-'}
                               </div>
                             </td>
 
+                            {/* 5. Date Open (Tarikh Sahaja Tanpa Masa) */}
                             <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
-                              {formatDateTimeDisplay(item.openDateRaw)}
+                              {formatDateOnlyDisplay(item.openDateRaw)}
                             </td>
 
+                            {/* 6. Target Est. Closing (Tarikh Sahaja) */}
                             <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
                               {item.estDateRaw ? formatDateOnlyDisplay(item.estDateRaw) : <span style={{ color: '#94a3b8' }}>Not specified</span>}
                               {item.targetDays !== null && (
@@ -1079,10 +1077,11 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               )}
                             </td>
 
+                            {/* 7. Date Closed (Tarikh Sahaja Tanpa Masa) */}
                             <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
                               {isResolved ? (
                                 <span style={{ color: '#15803d', fontWeight: '600' }}>
-                                  {formatDateTimeDisplay(item.closedDateRaw)}
+                                  {formatDateOnlyDisplay(item.closedDateRaw)}
                                 </span>
                               ) : (
                                 <span style={{ color: '#ea580c', fontStyle: 'italic', fontSize: '11px' }}>
@@ -1091,6 +1090,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               )}
                             </td>
 
+                            {/* 8. Lead Time */}
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <div style={{ fontWeight: 'bold', color: isResolved ? '#15803d' : '#0369a1', fontSize: '13px' }}>
                                 {item.actualDays} <span style={{ fontSize: '11px' }}>Days</span>
@@ -1100,6 +1100,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               </div>
                             </td>
 
+                            {/* 9. Delay Variance */}
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               {isDelayed ? (
                                 <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
@@ -1112,6 +1113,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               )}
                             </td>
 
+                            {/* 10. Status */}
                             <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                               <span
                                 style={{
