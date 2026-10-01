@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -30,6 +30,9 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [rawIssues, setRawIssues] = useState([]);
   
+  // Navigation Tab inside Analytics: 'overview' vs 'resolution_list'
+  const [activeSubTab, setActiveSubTab] = useState('overview');
+
   // Date Filters
   const [filterMode, setFilterMode] = useState('all'); 
   const [timeRange, setTimeRange] = useState('all'); 
@@ -45,6 +48,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   // Classification Cross-Filter
   const [selectedClassification, setSelectedClassification] = useState(null);
 
+  // Resolution List Search & Status Filter
+  const [listSearchQuery, setListSearchQuery] = useState('');
+  const [listStatusFilter, setListStatusFilter] = useState('all');
+
   // Display States
   const [stats, setStats] = useState({ total: 0, inProgress: 0, closed: 0 });
   const [statusComboData, setStatusComboData] = useState([]);
@@ -55,7 +62,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const [showAllLocations, setShowAllLocations] = useState(false);
 
   // HOD Executive Metrics: Lead Time & Delay
-  const [leadTimeComparisonData, setLeadTimeComparisonData] = useState([]);
   const [hodSummary, setHodSummary] = useState({
     avgActualDays: 0,
     avgTargetDays: 0,
@@ -68,7 +74,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const { data, error } = await supabase.from('issues').select('*');
+      const { data, error } = await supabase.from('issues').select('*').order('date_time', { ascending: false });
       if (error) {
         console.error('Error fetching issues:', error.message);
       } else {
@@ -83,7 +89,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     return String(Math.min(5, Math.ceil(dayNumber / 7)));
   };
 
-  // Helper to recognize closed status variants
   const isClosedStatus = (statusStr) => {
     if (!statusStr) return false;
     const s = String(statusStr).trim().toLowerCase();
@@ -97,7 +102,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     );
   };
 
-  // Safe date parsing supporting ISO, hyphenated, and slash-separated strings
   const parseDateSafe = (dateStr) => {
     if (!dateStr) return null;
     try {
@@ -120,30 +124,39 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     }
   };
 
-  const processDashboard = useCallback(() => {
-    if (!rawIssues.length) {
-      setStats({ total: 0, inProgress: 0, closed: 0 });
-      setStatusComboData([]);
-      setLocationData([]);
-      setClassificationData([]);
-      setTrendData([]);
-      setAgingData([]);
-      setLeadTimeComparisonData([]);
-      setHodSummary({
-        avgActualDays: 0,
-        avgTargetDays: 0,
-        avgDelayDays: 0,
-        onTimeCount: 0,
-        delayedCount: 0,
-        closedTotal: 0
-      });
-      return;
+  const formatDateTimeDisplay = (dateStr) => {
+    if (!dateStr) return '-';
+    const cleanStr = dateStr.replace('T', ' ');
+    const [datePart, timePart] = cleanStr.split(' ');
+    if (datePart && datePart.includes('-')) {
+      const [year, month, day] = datePart.split('-');
+      let formattedTime = '';
+      if (timePart) {
+        const [h, m] = timePart.split(':');
+        const hour = parseInt(h, 10);
+        if (!isNaN(hour)) {
+          formattedTime = `, ${hour % 12 || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+        }
+      }
+      return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}${formattedTime}`;
     }
+    return dateStr;
+  };
 
+  const formatDateOnlyDisplay = (dateStr) => {
+    if (!dateStr) return '-';
+    const clean = dateStr.split('T')[0].split(' ')[0];
+    if (clean && clean.includes('-')) {
+      const [year, month, day] = clean.split('-');
+      return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}`;
+    }
+    return dateStr;
+  };
+
+  // Filtered dataset based on header filters
+  const dateAndGroupFiltered = useMemo(() => {
     const now = new Date();
-
-    // 1. Filter Date & Group
-    const dateAndGroupFiltered = rawIssues.filter((item) => {
+    return rawIssues.filter((item) => {
       if (selectedGroup !== 'all') {
         const itemGroup = (item.group_name || '').trim().toLowerCase();
         if (itemGroup !== selectedGroup.trim().toLowerCase()) return false;
@@ -186,15 +199,85 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
       return true;
     });
+  }, [rawIssues, selectedGroup, filterMode, timeRange, selectedMonth, selectedWeek, selectedYear]);
 
-    // 2. Classification Distribution Map
+  // Individual issue resolution calculation
+  const individualIssueMetrics = useMemo(() => {
+    const now = new Date();
+
+    return dateAndGroupFiltered.map((issue) => {
+      const isDone = isClosedStatus(issue.status);
+      const openDate = parseDateSafe(issue.date_time || issue.created_at);
+      const estCloseDate = parseDateSafe(issue.estimated_closing);
+      const actualClosedDate = parseDateSafe(issue.updated_at || issue.date_time);
+
+      let actualDays = 0;
+      let targetDays = null;
+      let delayDays = 0;
+      let statusCategory = 'On Track (Open)';
+
+      if (openDate) {
+        if (estCloseDate && estCloseDate >= openDate) {
+          targetDays = Math.max(1, Math.round((estCloseDate - openDate) / (1000 * 60 * 60 * 24)));
+        }
+
+        if (isDone && actualClosedDate) {
+          actualDays = Math.max(0, Math.round((actualClosedDate - openDate) / (1000 * 60 * 60 * 24)));
+          if (estCloseDate) {
+            delayDays = Math.round((actualClosedDate - estCloseDate) / (1000 * 60 * 60 * 24));
+          }
+          statusCategory = delayDays > 0 ? 'Resolved (Delayed)' : 'Resolved (On-Time)';
+        } else {
+          // Open issue running duration
+          actualDays = Math.max(0, Math.round((now - openDate) / (1000 * 60 * 60 * 24)));
+          if (estCloseDate && now > estCloseDate) {
+            delayDays = Math.round((now - estCloseDate) / (1000 * 60 * 60 * 24));
+            statusCategory = 'Overdue (Active)';
+          }
+        }
+      }
+
+      return {
+        ...issue,
+        isDone,
+        openDateRaw: issue.date_time || issue.created_at,
+        closedDateRaw: isDone ? (issue.updated_at || issue.date_time) : null,
+        estDateRaw: issue.estimated_closing,
+        actualDays,
+        targetDays,
+        delayDays,
+        statusCategory
+      };
+    });
+  }, [dateAndGroupFiltered]);
+
+  const processDashboard = useCallback(() => {
+    if (!dateAndGroupFiltered.length) {
+      setStats({ total: 0, inProgress: 0, closed: 0 });
+      setStatusComboData([]);
+      setLocationData([]);
+      setClassificationData([]);
+      setTrendData([]);
+      setAgingData([]);
+      setHodSummary({
+        avgActualDays: 0,
+        avgTargetDays: 0,
+        avgDelayDays: 0,
+        onTimeCount: 0,
+        delayedCount: 0,
+        closedTotal: 0
+      });
+      return;
+    }
+
+    const now = new Date();
+
     const classMap = {};
     dateAndGroupFiltered.forEach((item) => {
       const classKey = item.classification ? `Class ${item.classification.toUpperCase()}` : 'UNCLASSIFIED';
       classMap[classKey] = (classMap[classKey] || 0) + 1;
     });
 
-    // 3. Cross-filtering
     const fullyFiltered = selectedClassification
       ? dateAndGroupFiltered.filter((item) => {
           const c = item.classification ? `Class ${item.classification.toUpperCase()}` : 'UNCLASSIFIED';
@@ -206,41 +289,32 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     let closedCount = 0;
     const locationMap = {};
     
-    // Aging breakdown accumulators
     let agingHealthy = 0;
     let agingDueSoon = 0;
     let agingOverdue = 0;
 
-    // Lead Time & Delay metric accumulators
     let totalTargetDaysSum = 0;
     let totalActualDaysSum = 0;
     let totalDelayDaysSum = 0;
     let onTimeClosed = 0;
     let delayedClosed = 0;
 
-    const groupComparisonMap = {};
-
     fullyFiltered.forEach((item) => {
       const isDone = isClosedStatus(item.status);
       const openDate = parseDateSafe(item.date_time || item.created_at);
       const estCloseDate = parseDateSafe(item.estimated_closing);
       const actualClosedDate = parseDateSafe(item.updated_at || item.date_time);
-      const grp = item.group_name || 'Others';
 
       if (isDone) {
         closedCount++;
 
         if (openDate && actualClosedDate) {
-          // Actual resolution days (Closed - Open)
           const actualDays = Math.max(0, Math.round((actualClosedDate - openDate) / (1000 * 60 * 60 * 24)));
-          
-          // Target planned days (Est. Closing - Open)
           let targetDays = actualDays;
           if (estCloseDate && estCloseDate >= openDate) {
             targetDays = Math.max(1, Math.round((estCloseDate - openDate) / (1000 * 60 * 60 * 24)));
           }
 
-          // Delay variance (Closed - Est. Closing)
           let delayDays = 0;
           if (estCloseDate) {
             delayDays = Math.round((actualClosedDate - estCloseDate) / (1000 * 60 * 60 * 24));
@@ -255,20 +329,11 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           totalTargetDaysSum += targetDays;
           totalActualDaysSum += actualDays;
-
-          if (!groupComparisonMap[grp]) {
-            groupComparisonMap[grp] = { targetTotal: 0, actualTotal: 0, delayTotal: 0, count: 0 };
-          }
-          groupComparisonMap[grp].targetTotal += targetDays;
-          groupComparisonMap[grp].actualTotal += actualDays;
-          groupComparisonMap[grp].delayTotal += Math.max(0, delayDays);
-          groupComparisonMap[grp].count += 1;
         }
 
       } else {
         inProgressCount++;
 
-        // Aging breakdown for open/pending issues
         if (estCloseDate) {
           const todayClean = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           const targetClean = new Date(estCloseDate.getFullYear(), estCloseDate.getMonth(), estCloseDate.getDate());
@@ -290,20 +355,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       locationMap[loc] = (locationMap[loc] || 0) + 1;
     });
 
-    // Structure lead time comparison chart data sorted descending by actual days
-    const comparisonArray = Object.keys(groupComparisonMap).map((grp) => {
-      const g = groupComparisonMap[grp];
-      return {
-        group: grp,
-        'Target Days': Number((g.targetTotal / g.count).toFixed(1)),
-        'Actual Days': Number((g.actualTotal / g.count).toFixed(1)),
-        'Avg Delay': Number((g.delayTotal / g.count).toFixed(1)),
-        count: g.count
-      };
-    }).sort((a, b) => b['Actual Days'] - a['Actual Days']);
-
-    setLeadTimeComparisonData(comparisonArray);
-
     setHodSummary({
       avgTargetDays: closedCount > 0 ? (totalTargetDaysSum / closedCount).toFixed(1) : 0,
       avgActualDays: closedCount > 0 ? (totalActualDaysSum / closedCount).toFixed(1) : 0,
@@ -313,7 +364,6 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       closedTotal: closedCount
     });
 
-    // Monthly Trend
     const monthCounts = {};
     MONTHS.forEach((m) => { 
       monthCounts[m.label.substring(0, 3)] = { created: 0, closed: 0 }; 
@@ -380,11 +430,35 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       }))
     );
 
-  }, [rawIssues, filterMode, timeRange, selectedMonth, selectedWeek, selectedYear, selectedGroup, selectedClassification]);
+  }, [dateAndGroupFiltered, selectedClassification]);
 
   useEffect(() => {
     processDashboard();
   }, [processDashboard]);
+
+  // Filtered issues specifically for the Resolution List Page
+  const filteredIndividualIssues = useMemo(() => {
+    return individualIssueMetrics.filter((item) => {
+      const q = listSearchQuery.toLowerCase();
+      const matchSearch =
+        !q ||
+        (item.what_issue && item.what_issue.toLowerCase().includes(q)) ||
+        (item.group_name && item.group_name.toLowerCase().includes(q)) ||
+        (item.location && item.location.toLowerCase().includes(q)) ||
+        (item.staff_name && item.staff_name.toLowerCase().includes(q));
+
+      if (!matchSearch) return false;
+
+      if (listStatusFilter === 'closed_ontime') return item.statusCategory === 'Resolved (On-Time)';
+      if (listStatusFilter === 'closed_delayed') return item.statusCategory === 'Resolved (Delayed)';
+      if (listStatusFilter === 'active_overdue') return item.statusCategory === 'Overdue (Active)';
+      if (listStatusFilter === 'active_ontrack') return item.statusCategory === 'On Track (Open)';
+      if (listStatusFilter === 'all_closed') return item.isDone;
+      if (listStatusFilter === 'all_active') return !item.isDone;
+
+      return true;
+    });
+  }, [individualIssueMetrics, listSearchQuery, listStatusFilter]);
 
   const renderCustomPercentageLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
     if (!value || percent === 0) return null;
@@ -452,11 +526,14 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const totalActiveBacklog = stats.inProgress;
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1300px', margin: '0 auto', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' }}>
+    <div style={{ padding: '20px', maxWidth: '1320px', margin: '0 auto', fontFamily: 'Arial, sans-serif', backgroundColor: '#f4f6f9', minHeight: '100vh' }}>
       
       {/* Analytics Control Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', backgroundColor: '#0d3b66', padding: '15px 20px', borderRadius: '8px', color: '#fff', flexWrap: 'wrap', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '22px' }}>Dashboard Analytics</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', backgroundColor: '#0d3b66', padding: '15px 20px', borderRadius: '8px', color: '#fff', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '22px' }}>Dashboard Analytics</h2>
+          <small style={{ opacity: 0.85, fontSize: '12px' }}>Manufacturing Engineering Executive Performance & Issue Tracking</small>
+        </div>
         
         {/* Dropdown Filters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -544,7 +621,50 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         </div>
       </div>
 
-      {/* Cross-Filter Slicer Indicator */}
+      {/* Sub-Tab Navigation Switcher */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+        <button
+          onClick={() => setActiveSubTab('overview')}
+          style={{
+            padding: '10px 18px',
+            borderRadius: '6px',
+            border: 'none',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            backgroundColor: activeSubTab === 'overview' ? '#0d3b66' : '#ffffff',
+            color: activeSubTab === 'overview' ? '#ffffff' : '#334155',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <span>📊</span> Overview & Charts
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('resolution_list')}
+          style={{
+            padding: '10px 18px',
+            borderRadius: '6px',
+            border: 'none',
+            fontSize: '13px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            backgroundColor: activeSubTab === 'resolution_list' ? '#0d3b66' : '#ffffff',
+            color: activeSubTab === 'resolution_list' ? '#ffffff' : '#334155',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <span>⏱️</span> Issue Lead Time & Delay Breakdown ({individualIssueMetrics.length})
+        </button>
+      </div>
+
+      {/* Slicer Indicator */}
       {selectedClassification && (
         <div style={{ backgroundColor: '#e2e8f0', padding: '10px 15px', borderRadius: '6px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Filtered by: <strong>{selectedClassification}</strong></span>
@@ -561,388 +681,469 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         <p style={{ textAlign: 'center', padding: '40px' }}>Loading analytics data...</p>
       ) : (
         <>
-          {/* 1. General KPI Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px', marginBottom: '20px' }}>
-            <div style={{ backgroundColor: '#fff', borderLeft: '6px solid #0d3b66', padding: '18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-              <span style={{ fontSize: '13px', color: '#666', fontWeight: 'bold' }}>
-                TOTAL ISSUES {selectedGroup !== 'all' && `(${selectedGroup})`}
-              </span>
-              <h2 style={{ margin: '8px 0 0 0', fontSize: '28px', color: '#0d3b66' }}>{stats.total}</h2>
+          {/* Executive KPI Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '22px' }}>
+            <div style={{ backgroundColor: '#fff', borderLeft: '6px solid #0d3b66', padding: '16px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+              <span style={{ fontSize: '11px', color: '#666', fontWeight: 'bold' }}>TOTAL ISSUES</span>
+              <h2 style={{ margin: '6px 0 0 0', fontSize: '26px', color: '#0d3b66' }}>{stats.total}</h2>
             </div>
             
-            <div style={{ backgroundColor: '#fff', borderLeft: '6px solid #ea580c', padding: '18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-              <span style={{ fontSize: '13px', color: '#666', fontWeight: 'bold' }}>ONGOING (IN PROGRESS)</span>
-              <h2 style={{ margin: '8px 0 0 0', fontSize: '28px', color: '#ea580c' }}>{stats.inProgress}</h2>
+            <div style={{ backgroundColor: '#fff', borderLeft: '6px solid #1d4ed8', padding: '16px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+              <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold' }}>AVG RESOLUTION TIME</span>
+              <h2 style={{ margin: '6px 0 0 0', fontSize: '26px', color: '#1d4ed8' }}>
+                {hodSummary.avgActualDays} <span style={{ fontSize: '13px', fontWeight: 'normal' }}>Days</span>
+              </h2>
             </div>
             
-            <div style={{ backgroundColor: '#fff', borderLeft: '6px solid #16a34a', padding: '18px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: '#666', fontWeight: 'bold' }}>CLOSED</span>
-                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 'bold', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
-                  {closeRate}% Rate
-                </span>
-              </div>
-              <h2 style={{ margin: '8px 0 0 0', fontSize: '28px', color: '#16a34a' }}>{stats.closed}</h2>
+            <div style={{ backgroundColor: '#fff', borderLeft: '6px solid #16a34a', padding: '16px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+              <span style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold' }}>ON-TIME RESOLUTION RATE</span>
+              <h2 style={{ margin: '6px 0 0 0', fontSize: '26px', color: '#16a34a' }}>
+                {hodSummary.closedTotal > 0 ? Math.round((hodSummary.onTimeCount / hodSummary.closedTotal) * 100) : 0}%
+              </h2>
+            </div>
+
+            <div style={{ backgroundColor: '#fff', borderLeft: '6px solid #dc2626', padding: '16px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+              <span style={{ fontSize: '11px', color: '#991b1b', fontWeight: 'bold' }}>AVG DELAY VARIANCE</span>
+              <h2 style={{ margin: '6px 0 0 0', fontSize: '26px', color: '#dc2626' }}>
+                +{hodSummary.avgDelayDays} <span style={{ fontSize: '13px', fontWeight: 'normal' }}>Days</span>
+              </h2>
             </div>
           </div>
 
           {/* =========================================================
-             2. HOD EXECUTIVE SECTION: Lead Time vs Target & Delay Analysis
+             VIEW 1: OVERVIEW & CHARTS
              ========================================================= */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '25px', borderTop: '4px solid #0d3b66' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-              <div>
-                <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⏱️</span> Issue Resolution Lead Time & Delay Analysis (HOD View)
-                </h3>
-                <small style={{ color: '#64748b' }}>
-                  Comparison between target schedule (Plan), actual resolution time taken, and delay variance
-                </small>
-              </div>
-            </div>
-
-            {/* 4 Executive KPI Metric Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px', marginBottom: '22px' }}>
+          {activeSubTab === 'overview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               
-              <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold', display: 'block' }}>AVG ACTUAL RESOLUTION TIME</span>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#1d4ed8' }}>
-                  {hodSummary.avgActualDays} <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Days</span>
-                </h3>
-                <small style={{ fontSize: '10px', color: '#1e40af' }}>Based on {hodSummary.closedTotal} closed issues</small>
-              </div>
-
-              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold', display: 'block' }}>AVG PLANNED TARGET TIME</span>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#15803d' }}>
-                  {hodSummary.avgTargetDays} <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Days</span>
-                </h3>
-                <small style={{ fontSize: '10px', color: '#166534' }}>Baseline Est. Closing duration</small>
-              </div>
-
-              <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#991b1b', fontWeight: 'bold', display: 'block' }}>AVG SCHEDULE DELAY</span>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#b91c1c' }}>
-                  +{hodSummary.avgDelayDays} <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Days</span>
-                </h3>
-                <small style={{ fontSize: '10px', color: '#991b1b' }}>For {hodSummary.delayedCount} overdue closed issues</small>
-              </div>
-
-              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#334155', fontWeight: 'bold', display: 'block' }}>ON-TIME RESOLUTION RATE</span>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#0d3b66' }}>
-                  {hodSummary.closedTotal > 0 ? Math.round((hodSummary.onTimeCount / hodSummary.closedTotal) * 100) : 0}%
-                </h3>
-                <small style={{ fontSize: '10px', color: '#64748b' }}>{hodSummary.onTimeCount} On-Time / {hodSummary.delayedCount} Delayed</small>
-              </div>
-
-            </div>
-
-            {/* Target Days vs Actual Days vs Delay Line Chart */}
-            <div style={{ backgroundColor: '#f8fafc', padding: '18px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
-                <h4 style={{ margin: 0, fontSize: '14px', color: '#0d3b66' }}>
-                  📊 Planned Target vs Actual Days by Group
-                </h4>
-                <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
-                  *Actual Days exceeding Target Days indicates schedule delay
-                </span>
-              </div>
-
-              {leadTimeComparisonData.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: '12px' }}>
-                  No closed issue records found within the selected filters.
-                </div>
-              ) : (
-                <div style={{ width: '100%', height: '320px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={leadTimeComparisonData} margin={{ top: 20, right: 30, left: 0, bottom: 25 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis 
-                        dataKey="group" 
-                        interval={0} 
-                        angle={-20} 
-                        textAnchor="end" 
-                        height={45} 
-                        tick={{ fontSize: 11, fontWeight: 'bold' }} 
-                      />
-                      <YAxis allowDecimals={false} unit=" d" />
-                      
-                      <Tooltip 
-                        formatter={(val, name) => [`${val} Days`, name]}
-                      />
-                      <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px', fontSize: '12px' }} />
-
-                      {/* Planned Target Bar */}
-                      <Bar 
-                        dataKey="Target Days" 
-                        fill="#0284c7" 
-                        name="Planned Target (Days)" 
-                        barSize={26}
-                        radius={[4, 4, 0, 0]} 
-                      />
-
-                      {/* Actual Duration Bar */}
-                      <Bar 
-                        dataKey="Actual Days" 
-                        fill="#f97316" 
-                        name="Actual Resolution (Days)" 
-                        barSize={26}
-                        radius={[4, 4, 0, 0]} 
-                      />
-
-                      {/* Average Delay Line */}
-                      <Line 
-                        type="monotone" 
-                        dataKey="Avg Delay" 
-                        stroke="#dc2626" 
-                        strokeWidth={3} 
-                        name="Average Delay (+Days)" 
-                        dot={{ r: 5, fill: '#dc2626' }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-            
-            {/* Row 1: Status ComposedChart & Classification PieChart */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-              
-              <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ marginTop: 0, color: '#0d3b66', fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                  📊 Issue Status & Progress Rate {selectedGroup !== 'all' && `(${selectedGroup})`}
-                </h3>
-                <div style={{ width: '100%', height: '280px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={statusComboData} margin={{ top: 35, right: 20, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="status" tick={{ fontWeight: 'bold', fontSize: 12 }} />
-                      <YAxis yAxisId="left" allowDecimals={false} domain={[0, maxAxisValue]} />
-                      <YAxis yAxisId="right" orientation="right" domain={[0, 100]} unit="%" />
-                      
-                      <Tooltip 
-                        formatter={(val, name, item) => [
-                          name === 'Count' ? `${val} issues` : `${item.payload.percentage}%`, 
-                          name
-                        ]} 
-                      />
-
-                      <Bar 
-                        yAxisId="left" 
-                        dataKey="count" 
-                        name="Count"
-                        barSize={46}
-                        radius={[4, 4, 0, 0]}
-                        label={renderInsideBarLabel}
-                      >
-                        {statusComboData.map((entry, idx) => (
-                          <Cell key={`bar-cell-${idx}`} fill={entry.fill} />
-                        ))}
-                      </Bar>
-
-                      <Line 
-                        yAxisId="left" 
-                        type="linear" 
-                        dataKey="count" 
-                        name="Rate (%)"
-                        stroke="#b91c1c" 
-                        strokeWidth={3} 
-                        dot={{ r: 5, fill: '#b91c1c' }}
-                        label={(props) => {
-                          const { x, y, index } = props;
-                          const percent = statusComboData[index]?.percentage;
-                          if (percent === undefined || percent === null) return null;
-                          return (
-                            <text
-                              x={x}
-                              y={y - 12}
-                              fill="#b91c1c"
-                              textAnchor="middle"
-                              style={{ fontSize: '12px', fontWeight: 'bold' }}
-                            >
-                              {`${percent}%`}
-                            </text>
-                          );
-                        }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Classification Distribution */}
-              <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                  <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
-                    🏷 Classification (Click slice to cross-filter)
+              {/* Row 1: Status ComposedChart & Classification PieChart */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                
+                <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                  <h3 style={{ marginTop: 0, color: '#0d3b66', fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                    📊 Issue Status & Progress Rate {selectedGroup !== 'all' && `(${selectedGroup})`}
                   </h3>
-                </div>
-                <div style={{ width: '100%', height: '280px' }}>
-                  {classificationData.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '100px 0', color: '#888' }}>No data available</div>
-                  ) : (
+                  <div style={{ width: '100%', height: '280px' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={classificationData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={0}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                          labelLine={true}
-                          label={renderCustomPercentageLabel}
-                          cursor="pointer"
-                          onClick={(entry) => setSelectedClassification((prev) => prev === entry.name ? null : entry.name)}
+                      <ComposedChart data={statusComboData} margin={{ top: 35, right: 20, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="status" tick={{ fontWeight: 'bold', fontSize: 12 }} />
+                        <YAxis yAxisId="left" allowDecimals={false} domain={[0, maxAxisValue]} />
+                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} unit="%" />
+                        
+                        <Tooltip 
+                          formatter={(val, name, item) => [
+                            name === 'Count' ? `${val} issues` : `${item.payload.percentage}%`, 
+                            name
+                          ]} 
+                        />
+
+                        <Bar 
+                          yAxisId="left" 
+                          dataKey="count" 
+                          name="Count"
+                          barSize={46}
+                          radius={[4, 4, 0, 0]}
+                          label={renderInsideBarLabel}
                         >
-                          {classificationData.map((entry, index) => (
-                            <Cell 
-                              key={`pie-cell-${index}`} 
-                              fill={entry.color} 
-                              stroke={selectedClassification === entry.name ? '#0d3b66' : '#fff'}
-                              strokeWidth={selectedClassification === entry.name ? 3 : 1}
-                            />
+                          {statusComboData.map((entry, idx) => (
+                            <Cell key={`bar-cell-${idx}`} fill={entry.fill} />
                           ))}
-                        </Pie>
-                        <Tooltip formatter={(val, name) => [`${val} issues`, name]} />
-                        <Legend />
-                      </PieChart>
+                        </Bar>
+
+                        <Line 
+                          yAxisId="left" 
+                          type="linear" 
+                          dataKey="count" 
+                          name="Rate (%)"
+                          stroke="#b91c1c" 
+                          strokeWidth={3} 
+                          dot={{ r: 5, fill: '#b91c1c' }}
+                          label={(props) => {
+                            const { x, y, index } = props;
+                            const percent = statusComboData[index]?.percentage;
+                            if (percent === undefined || percent === null) return null;
+                            return (
+                              <text
+                                x={x}
+                                y={y - 12}
+                                fill="#b91c1c"
+                                textAnchor="middle"
+                                style={{ fontSize: '12px', fontWeight: 'bold' }}
+                              >
+                                {`${percent}%`}
+                              </text>
+                            );
+                          }}
+                        />
+                      </ComposedChart>
                     </ResponsiveContainer>
-                  )}
+                  </div>
                 </div>
-              </div>
 
-            </div>
-
-            {/* Row 2: Monthly Trend & Unresolved Aging Donut Chart */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-              
-              {/* Trend Chart */}
-              <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ marginTop: 0, color: '#0d3b66', fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                  📈 Issues Created vs Closed Trend
-                </h3>
-                <div style={{ width: '100%', height: '290px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} />
-                      <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Donut Chart */}
-              <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ marginTop: 0, color: '#0d3b66', fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-                  ⏱️ Pending Issues Aging Breakdown
-                </h3>
-
-                <div style={{ width: '100%', height: '290px', position: 'relative' }}>
-                  {totalActiveBacklog === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '100px 0', color: '#16a34a', fontWeight: 'bold' }}>
-                      🎉 Zero Unresolved Backlog (All Closed)
-                    </div>
-                  ) : (
-                    <>
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '46%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          textAlign: 'center',
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        <span style={{ fontSize: '26px', fontWeight: 'bold', color: '#0d3b66', display: 'block', lineHeight: 1 }}>
-                          {totalActiveBacklog}
-                        </span>
-                        <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>
-                          Pending
-                        </span>
-                      </div>
-
+                {/* Classification Distribution */}
+                <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                    <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
+                      🏷️ Classification (Click slice to cross-filter)
+                    </h3>
+                  </div>
+                  <div style={{ width: '100%', height: '280px' }}>
+                    {classificationData.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '100px 0', color: '#888' }}>No data available</div>
+                    ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <PieChart margin={{ top: 18, bottom: 10, left: 10, right: 10 }}>
+                        <PieChart>
                           <Pie
-                            data={agingData}
+                            data={classificationData}
                             cx="50%"
-                            cy="46%"
-                            innerRadius={45}
-                            outerRadius={65}
-                            paddingAngle={3}
-                            dataKey="count"
+                            cy="50%"
+                            innerRadius={0}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
                             labelLine={true}
-                            label={renderAgingPercentageLabel}
+                            label={renderCustomPercentageLabel}
+                            cursor="pointer"
+                            onClick={(entry) => setSelectedClassification((prev) => prev === entry.name ? null : entry.name)}
                           >
-                            {agingData.map((entry, idx) => (
-                              <Cell key={`aging-donut-${idx}`} fill={entry.fill} stroke="#fff" strokeWidth={2} />
+                            {classificationData.map((entry, index) => (
+                              <Cell 
+                                key={`pie-cell-${index}`} 
+                                fill={entry.color} 
+                                stroke={selectedClassification === entry.name ? '#0d3b66' : '#fff'}
+                                strokeWidth={selectedClassification === entry.name ? 3 : 1}
+                              />
                             ))}
                           </Pie>
                           <Tooltip formatter={(val, name) => [`${val} issues`, name]} />
-                          <Legend 
-                            verticalAlign="bottom" 
-                            wrapperStyle={{ paddingTop: '8px' }}
-                          />
+                          <Legend />
                         </PieChart>
                       </ResponsiveContainer>
-                    </>
-                  )}
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Row 2: Monthly Trend & Unresolved Aging Donut Chart */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+                
+                {/* Trend Chart */}
+                <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                  <h3 style={{ marginTop: 0, color: '#0d3b66', fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                    📈 Issues Created vs Closed Trend
+                  </h3>
+                  <div style={{ width: '100%', height: '290px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Donut Chart */}
+                <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                  <h3 style={{ marginTop: 0, color: '#0d3b66', fontSize: '16px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                    ⏱️ Pending Issues Aging Breakdown
+                  </h3>
+
+                  <div style={{ width: '100%', height: '290px', position: 'relative' }}>
+                    {totalActiveBacklog === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '100px 0', color: '#16a34a', fontWeight: 'bold' }}>
+                        🎉 Zero Unresolved Backlog (All Closed)
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '46%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            textAlign: 'center',
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          <span style={{ fontSize: '26px', fontWeight: 'bold', color: '#0d3b66', display: 'block', lineHeight: 1 }}>
+                            {totalActiveBacklog}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>
+                            Pending
+                          </span>
+                        </div>
+
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart margin={{ top: 18, bottom: 10, left: 10, right: 10 }}>
+                            <Pie
+                              data={agingData}
+                              cx="50%"
+                              cy="46%"
+                              innerRadius={45}
+                              outerRadius={65}
+                              paddingAngle={3}
+                              dataKey="count"
+                              labelLine={true}
+                              label={renderAgingPercentageLabel}
+                            >
+                              {agingData.map((entry, idx) => (
+                                <Cell key={`aging-donut-${idx}`} fill={entry.fill} stroke="#fff" strokeWidth={2} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(val, name) => [`${val} issues`, name]} />
+                            <Legend 
+                              verticalAlign="bottom" 
+                              wrapperStyle={{ paddingTop: '8px' }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Row 3: Issues Breakdown by Location */}
+              <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '15px' }}>
+                  <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
+                    📍 Issues Breakdown by Location/Station ({showAllLocations ? 'All' : 'Top 20'})
+                  </h3>
+                  <button
+                    onClick={() => setShowAllLocations(!showAllLocations)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      borderRadius: '4px',
+                      border: '1px solid #0d3b66',
+                      backgroundColor: '#fff',
+                      color: '#0d3b66',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showAllLocations ? 'Show Top 20' : 'Show All'}
+                  </button>
+                </div>
+
+                <div style={{ width: '100%', height: '350px', overflowX: showAllLocations ? 'auto' : 'hidden' }}>
+                  <div style={{ width: chartWidth, height: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={displayedLocationData} margin={{ top: 20, right: 30, left: 0, bottom: 25 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="location" interval={0} angle={-30} textAnchor="end" height={50} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
 
             </div>
+          )}
 
-            {/* Row 3: Issues Breakdown by Location */}
-            <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '15px' }}>
-                <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
-                  📍 Issues Breakdown by Location/Station ({showAllLocations ? 'All' : 'Top 20'})
-                </h3>
-                <button
-                  onClick={() => setShowAllLocations(!showAllLocations)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    borderRadius: '4px',
-                    border: '1px solid #0d3b66',
-                    backgroundColor: '#fff',
-                    color: '#0d3b66',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {showAllLocations ? 'Show Top 20' : 'Show All'}
-                </button>
-              </div>
+          {/* =========================================================
+             VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
+             ========================================================= */}
+          {activeSubTab === 'resolution_list' && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+              
+              {/* Header Title & In-Table Filters */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '18px' }}>
+                    ⏱️ Individual Issue Resolution & Delay Tracker
+                  </h3>
+                  <small style={{ color: '#64748b' }}>
+                    Tracks exact open timestamp, baseline target, closed timestamp, and delay variance for each issue
+                  </small>
+                </div>
 
-              <div style={{ width: '100%', height: '350px', overflowX: showAllLocations ? 'auto' : 'hidden' }}>
-                <div style={{ width: chartWidth, height: '100%' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={displayedLocationData} margin={{ top: 20, right: 30, left: 0, bottom: 25 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="location" interval={0} angle={-30} textAnchor="end" height={50} />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Search issue title, group, PIC..."
+                    value={listSearchQuery}
+                    onChange={(e) => setListSearchQuery(e.target.value)}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      width: '230px',
+                      outline: 'none'
+                    }}
+                  />
+
+                  <select
+                    value={listStatusFilter}
+                    onChange={(e) => setListStatusFilter(e.target.value)}
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#0d3b66',
+                      backgroundColor: '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">All Records ({individualIssueMetrics.length})</option>
+                    <option value="closed_ontime">✅ Resolved On-Time</option>
+                    <option value="closed_delayed">⚠️ Resolved Delayed</option>
+                    <option value="active_overdue">🚨 Active Overdue</option>
+                    <option value="active_ontrack">⏳ Active On Track</option>
+                    <option value="all_closed">⚫ All Closed</option>
+                    <option value="all_active">◑ All Active</option>
+                  </select>
                 </div>
               </div>
-            </div>
 
-          </div>
+              {/* Resolution Table */}
+              {filteredIndividualIssues.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+                  No issues found matching the selected filter criteria.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#0d3b66', color: '#ffffff', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>No.</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>Issue Details</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>Group / PIC</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>📅 Date & Time Open</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>🎯 Target Est. Closing</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1' }}>🏁 Date & Time Closed</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Lead Time</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Delay Variance</th>
+                        <th style={{ padding: '12px 10px', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredIndividualIssues.map((item, index) => {
+                        const isDelayed = item.delayDays > 0;
+                        const isResolved = item.isDone;
+
+                        return (
+                          <tr
+                            key={item.id}
+                            style={{
+                              backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc',
+                              borderBottom: '1px solid #e2e8f0'
+                            }}
+                          >
+                            <td style={{ padding: '12px 10px', color: '#64748b', fontWeight: 'bold' }}>
+                              {index + 1}
+                            </td>
+                            
+                            <td style={{ padding: '12px 10px', maxWidth: '240px' }}>
+                              <div style={{ fontWeight: 'bold', color: '#0d3b66', marginBottom: '2px' }}>
+                                {item.what_issue || 'Untitled Issue'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                {item.location ? `Loc: ${item.location}` : ''} {item.classification ? `• Class ${item.classification}` : ''}
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '12px 10px' }} className="notranslate" translate="no">
+                              <div style={{ fontWeight: 'bold', color: '#1e293b' }}>
+                                {item.group_name || '-'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                PIC: {item.pic_name || item.pic || item.staff_name || '-'}
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                              {formatDateTimeDisplay(item.openDateRaw)}
+                            </td>
+
+                            <td style={{ padding: '12px 10px', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                              {item.estDateRaw ? formatDateOnlyDisplay(item.estDateRaw) : <span style={{ color: '#94a3b8' }}>Not specified</span>}
+                              {item.targetDays !== null && (
+                                <div style={{ fontSize: '10px', color: '#64748b' }}>
+                                  ({item.targetDays} days plan)
+                                </div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '12px 10px', whiteSpace: 'nowrap' }}>
+                              {isResolved ? (
+                                <span style={{ color: '#15803d', fontWeight: '600' }}>
+                                  {formatDateTimeDisplay(item.closedDateRaw)}
+                                </span>
+                              ) : (
+                                <span style={{ color: '#ea580c', fontStyle: 'italic', fontSize: '11px' }}>
+                                  Still Open / In Progress
+                                </span>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <div style={{ fontWeight: 'bold', color: isResolved ? '#15803d' : '#0369a1', fontSize: '13px' }}>
+                                {item.actualDays} <span style={{ fontSize: '11px' }}>Days</span>
+                              </div>
+                              <div style={{ fontSize: '10px', color: '#64748b' }}>
+                                {isResolved ? 'Total Duration' : 'Open Running'}
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              {isDelayed ? (
+                                <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
+                                  +{item.delayDays} Days Delay
+                                </div>
+                              ) : (
+                                <div style={{ backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold', display: 'inline-block' }}>
+                                  {isResolved ? 'On-Time' : 'On Track'}
+                                </div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  backgroundColor: 
+                                    item.statusCategory === 'Resolved (On-Time)' ? '#dcfce7' :
+                                    item.statusCategory === 'Resolved (Delayed)' ? '#fee2e2' :
+                                    item.statusCategory === 'Overdue (Active)' ? '#fef3c7' : '#e0f2fe',
+                                  color:
+                                    item.statusCategory === 'Resolved (On-Time)' ? '#15803d' :
+                                    item.statusCategory === 'Resolved (Delayed)' ? '#b91c1c' :
+                                    item.statusCategory === 'Overdue (Active)' ? '#b45309' : '#0369a1',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {item.statusCategory}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+            </div>
+          )}
         </>
       )}
 
