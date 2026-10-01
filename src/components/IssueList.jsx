@@ -44,6 +44,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
   // Update Modal State
   const [selectedIssue, setSelectedIssue] = useState(null);
   const [modalStatus, setModalStatus] = useState('In Progress (1/4)');
+  const [actualClosingDate, setActualClosingDate] = useState('');
   const [rootCause, setRootCause] = useState('');
   const [countermeasure, setCountermeasure] = useState('');
   const [stageDetails, setStageDetails] = useState(DEFAULT_STAGES);
@@ -119,6 +120,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
 
     const draftPayload = {
       modalStatus,
+      actualClosingDate,
       rootCause,
       countermeasure,
       stageDetails,
@@ -126,7 +128,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     };
 
     localStorage.setItem(`draft_update_${selectedIssue.id}`, JSON.stringify(draftPayload));
-  }, [selectedIssue, modalStatus, rootCause, countermeasure, stageDetails, activeStageTab]);
+  }, [selectedIssue, modalStatus, actualClosingDate, rootCause, countermeasure, stageDetails, activeStageTab]);
 
   const handleGroupFilterChange = (e) => {
     setGroupFilter(e.target.value);
@@ -331,6 +333,12 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     }
     setModalStatus(cur);
 
+    // Initial actual closing date setup
+    const existingClosedDate = issue.closed_date 
+      ? issue.closed_date.split('T')[0] 
+      : (cur.includes('4/4') && issue.updated_at ? issue.updated_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setActualClosingDate(existingClosedDate);
+
     const matrix = issue.progress_matrix && typeof issue.progress_matrix === 'object' ? issue.progress_matrix : {};
 
     setRootCause(matrix.root_cause || issue.root_cause || '');
@@ -363,6 +371,10 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
 
   const handleStatusChange = (newStatus) => {
     setModalStatus(newStatus);
+
+    if (newStatus.includes('4/4') && !actualClosingDate) {
+      setActualClosingDate(new Date().toISOString().split('T')[0]);
+    }
 
     let targetStage = '2/4';
     if (newStatus.includes('3/4')) targetStage = '3/4';
@@ -409,6 +421,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
         if (draft.stageDetails) {
           setStageDetails(draft.stageDetails);
           setModalStatus(draft.modalStatus || issue.status || 'In Progress (1/4)');
+          setActualClosingDate(draft.actualClosingDate || new Date().toISOString().split('T')[0]);
           setRootCause(draft.rootCause ?? '');
           setCountermeasure(draft.countermeasure ?? '');
           setActiveStageTab(draft.activeStageTab || '2/4');
@@ -557,6 +570,11 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     setUpdating(true);
     const now = new Date().toISOString();
 
+    const isClosing = modalStatus.includes('4/4') || modalStatus === 'Closed';
+    const finalClosedDate = isClosing 
+      ? (actualClosingDate ? new Date(actualClosingDate).toISOString() : now)
+      : null;
+
     const structuredPayload = {
       root_cause: rootCause,
       countermeasure: countermeasure,
@@ -568,14 +586,20 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
 
     const latestNote = stageDetails[activeStageTab]?.progress || selectedIssue.progress_note || '';
 
+    const updatePayload = {
+      status: modalStatus,
+      progress_note: latestNote,
+      progress_matrix: structuredPayload,
+      updated_at: now
+    };
+
+    if (finalClosedDate) {
+      updatePayload.closed_date = finalClosedDate;
+    }
+
     const { error } = await supabase
       .from('issues')
-      .update({
-        status: modalStatus,
-        progress_note: latestNote,
-        progress_matrix: structuredPayload,
-        updated_at: now
-      })
+      .update(updatePayload)
       .eq('id', selectedIssue.id);
 
     if (error) {
@@ -750,6 +774,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
         'Progress': formattedProgress,
         'Remarks': formattedRemarks,
         'Estimate Closing Date': i.estimated_closing ? formatDateOnly(i.estimated_closing) : '-',
+        'Actual Closed Date': i.closed_date ? formatDateOnly(i.closed_date) : '-',
         'File Attachment URL': i.file_url || '-',
         'External Link': i.onedrive_link || '-'
       };
@@ -792,6 +817,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
       { wch: 30 },
       { wch: 45 },
       { wch: 45 },
+      { wch: 20 },
       { wch: 20 },
       { wch: 40 },
       { wch: 40 }
@@ -1012,7 +1038,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 7. Reporter Filter (Renamed from Name) */}
+          {/* 7. Reporter Filter */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               👤 Reporter:
@@ -1104,7 +1130,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     </div>
                   )}
 
-                  {/* Protected Fields: Group, Reporter (Renamed from Name), Location, Engine Variant, PIC */}
+                  {/* Protected Fields: Group, Reporter, Location, Engine Variant, PIC */}
                   <div style={{ fontSize: '12px', color: '#444', display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
                     <div>
                       👥 <b>Group:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.group_name || '-'}</span>
@@ -1166,6 +1192,13 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                         </div>
                       )}
                     </div>
+
+                    {/* Actual Closed Date indicator if available */}
+                    {issue.closed_date && (
+                      <div>
+                        🏁 <b>Actual Closed:</b> <span style={{ fontWeight: 'bold', color: '#16a34a' }}>{formatDateOnly(issue.closed_date)}</span>
+                      </div>
+                    )}
 
                     {/* Overall Root Cause & Countermeasure */}
                     {(matrix.root_cause || matrix.countermeasure) && (
@@ -1249,7 +1282,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                           onClick={() => handleOpenUpdateModal(issue)}
                           style={{ border: 'none', backgroundColor: '#e9ecef', cursor: 'pointer', padding: '5px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', color: '#333' }}
                         >
-                          ✏️ Update
+                          ✏️️ Update
                         </button>
 
                         <button
@@ -1319,7 +1352,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             <form onSubmit={handleSaveProgressMatrix}>
               
               {/* Status Selector */}
-              <div style={{ marginBottom: '15px', backgroundColor: '#f1f5f9', padding: '10px', borderRadius: '6px' }}>
+              <div style={{ marginBottom: '15px', backgroundColor: '#f1f5f9', padding: '12px', borderRadius: '6px' }}>
                 <label style={{ display: 'block', fontWeight: 'bold', fontSize: '12px', marginBottom: '5px', color: '#0f172a' }}>
                   Current Closing Status:
                 </label>
@@ -1333,11 +1366,39 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                   <option value="In Progress (3/4)">◕ In Progress (3/4)</option>
                   <option value="Closed (4/4)">⚫ Closed (4/4)</option>
                 </select>
-                <small style={{ color: '#64748b', display: 'block', marginTop: '4px' }}>
+
+                {/* Actual Closing Date field when status is Closed (4/4) */}
+                {modalStatus.includes('4/4') && (
+                  <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px' }}>
+                    <label style={{ display: 'block', fontWeight: 'bold', fontSize: '12px', color: '#065f46', marginBottom: '4px' }}>
+                      📅 Actual Closed Date:
+                    </label>
+                    <input
+                      type="date"
+                      value={actualClosingDate}
+                      onChange={(e) => setActualClosingDate(e.target.value)}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '5px',
+                        border: '1px solid #10b981',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#065f46',
+                        backgroundColor: '#fff',
+                        outline: 'none'
+                      }}
+                    />
+                    <small style={{ color: '#047857', display: 'block', marginTop: '4px', fontSize: '11px' }}>
+                      *Set when this issue was actually resolved. You can backdate if the issue was closed earlier.
+                    </small>
+                  </div>
+                )}
+
+                <small style={{ color: '#64748b', display: 'block', marginTop: '6px' }}>
                   {modalStatus === 'In Progress (1/4)' && (
                     '*Stage 1/4 marks a newly registered issue. Select 2/4 or above to start entering action progress.'
                   )}
-                  {modalStatus !== 'In Progress (1/4)' && modalStatus !== 'Closed (4/4)' && (
+                  {modalStatus !== 'In Progress (1/4)' && !modalStatus.includes('4/4') && (
                     '*Advancing the status unlocks the respective stage tab and automatically carries forward previous notes.'
                   )}
                 </small>
@@ -1416,6 +1477,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     {activeStageTab === '4/4' ? 'Action & Verification for Closed (4/4):' : `Progress & Remark for In Progress ${activeStageTab}:`}
                   </span>
 
+                  {/* Manual Forward Button */}
                   {activeStageTab !== '2/4' && (
                     <button
                       type="button"
