@@ -453,7 +453,7 @@ export default function App() {
 
   return (
     <div className={`dashboard-container ${isPortrait ? 'is-portrait' : 'is-landscape'}`}>
-      {/* Top Navigation Bar with Analog Clock & Live Digital Time Badge */}
+      {/* Top Navigation Bar with Separated Analog Circle & Digital Date-Time Box */}
       <div 
         className="top-nav" 
         style={{ 
@@ -471,24 +471,42 @@ export default function App() {
           </button>
         </div>
 
-        {/* Live Clock Badge: Analog Clock on Left + Digital Date & Time on Right */}
-        <div
-          style={{
-            backgroundColor: '#0d3b66',
-            borderRadius: '12px',
-            padding: '7px 16px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '12px',
-            boxShadow: '0 3px 10px rgba(13, 59, 102, 0.2)',
-            border: '1px solid rgba(255, 255, 255, 0.12)'
-          }}
-        >
-          {/* Mini Analog Clock on Left */}
-          <MiniAnalogClock time={currentTime} />
+        {/* Separated Clock Layout: Circular Analog (Left) + Rectangular Digital (Right) */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+          
+          {/* 1. Standalone Circular Analog Clock Badge */}
+          <div
+            style={{
+              width: '46px',
+              height: '46px',
+              borderRadius: '50%',
+              backgroundColor: '#0d3b66',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 3px 10px rgba(13, 59, 102, 0.25)',
+              border: '2px solid rgba(255, 255, 255, 0.2)',
+              flexShrink: 0
+            }}
+          >
+            <MiniAnalogClock time={currentTime} />
+          </div>
 
-          {/* Digital Time & Date on Right */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.15 }}>
+          {/* 2. Standalone Rectangular Digital Time & Date Badge */}
+          <div
+            style={{
+              backgroundColor: '#0d3b66',
+              borderRadius: '12px',
+              padding: '7px 18px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 3px 10px rgba(13, 59, 102, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              lineHeight: 1.15
+            }}
+          >
             <div style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.6px' }}>
               {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}{' '}
               <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>
@@ -499,6 +517,7 @@ export default function App() {
               {currentTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
             </div>
           </div>
+
         </div>
 
         <div>
