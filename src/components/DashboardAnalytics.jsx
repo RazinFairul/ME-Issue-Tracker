@@ -485,7 +485,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [individualIssueMetrics, listSearchQuery, listStatusFilter, listGroupFilter, listReporterFilter, listStationFilter]);
 
-  // Data Analisis Skala Besar: Taburan Peratusan Kesihatan Masa (Gauge / Pie Data)
+  // Health breakdown ratio with highlighted percentages
   const healthRatioData = useMemo(() => {
     let onTimeCount = 0;
     let delayedClosedCount = 0;
@@ -1003,7 +1003,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           {/* =========================================================
              VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
-             Clean Multi-Filter Table + Executive Delay Health Bar
+             Clean Multi-Filter Table + Highlighted Percentage Ratio Bar
              ========================================================= */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -1131,7 +1131,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
               </div>
 
-              {/* Scalable Visual Tracker: Health Status & Composition Ratio Bar */}
+              {/* Scalable Visual Tracker: Highlighted Percentage Breakdown */}
               <div style={{ backgroundColor: '#f8fafc', padding: '16px 20px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
                   <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0d3b66' }}>
@@ -1154,14 +1154,14 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           backgroundColor: item.color,
                           transition: 'width 0.4s ease'
                         }}
-                        title={`${item.name}: ${item.count} issues (${item.percent}%)`}
+                        title={`${item.name}: ${item.percent}% (${item.count} issues)`}
                       />
                     );
                   })}
                 </div>
 
-                {/* Legend Pill Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                {/* Highlighted Percentage Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
                   {healthRatioData.map((item, idx) => (
                     <div
                       key={`health-card-${idx}`}
@@ -1169,17 +1169,19 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         backgroundColor: '#ffffff',
                         border: '1px solid #e2e8f0',
                         borderRadius: '6px',
-                        padding: '8px 12px',
+                        padding: '10px 14px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: '10px'
                       }}
                     >
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.color, flexShrink: 0 }} />
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: item.color, flexShrink: 0 }} />
                       <div>
-                        <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold' }}>{item.name}</div>
-                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#1e293b' }}>
-                          {item.count} <span style={{ fontSize: '10px', fontWeight: 'normal', color: '#64748b' }}>({item.percent}%)</span>
+                        <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                          {item.name}
+                        </div>
+                        <div style={{ fontSize: '18px', fontWeight: '800', color: item.color, lineHeight: 1.1, marginTop: '2px' }}>
+                          {item.percent}% <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>({item.count})</span>
                         </div>
                       </div>
                     </div>
