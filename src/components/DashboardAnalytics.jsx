@@ -43,10 +43,9 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
   const [dbMasterGroups, setDbMasterGroups] = useState([]);
   const [dbMasterStations, setDbMasterStations] = useState([]);
   
-  // Sub-tab navigation
   const [activeSubTab, setActiveSubTab] = useState('overview');
 
-  // Trigger animation for Health Breakdown bar on tab switch
+  // Smooth progressive filling animation for Health Bar
   const [animateHealthBar, setAnimateHealthBar] = useState(false);
 
   useEffect(() => {
@@ -760,7 +759,7 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
           {activeSubTab === 'overview' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               
-              {/* Row 1: Issue Status Chart with Static Labels (No Blinking) */}
+              {/* Row 1: Issue Status Chart with Smooth Animation & Static Numbers */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
                 
                 <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
@@ -782,14 +781,16 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                           ]} 
                         />
 
-                        {/* Static Bars without continuous re-render flicker */}
+                        {/* Smooth active rising animation with stable static centered labels */}
                         <Bar 
                           yAxisId="left" 
                           dataKey="count" 
                           name="Count"
                           barSize={46}
                           radius={[4, 4, 0, 0]}
-                          isAnimationActive={false}
+                          isAnimationActive={true}
+                          animationDuration={900}
+                          animationEasing="ease-out"
                         >
                           {statusComboData.map((entry, idx) => (
                             <Cell key={`bar-cell-${idx}`} fill={entry.fill} />
@@ -802,7 +803,7 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                           />
                         </Bar>
 
-                        {/* Static Line without continuous re-render flicker */}
+                        {/* Smooth active drawing line animation with stable static top labels */}
                         <Line 
                           yAxisId="left" 
                           type="linear" 
@@ -811,7 +812,9 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                           stroke="#b91c1c" 
                           strokeWidth={3} 
                           dot={{ r: 5, fill: '#b91c1c' }}
-                          isAnimationActive={false}
+                          isAnimationActive={true}
+                          animationDuration={900}
+                          animationEasing="ease-out"
                         >
                           <LabelList 
                             dataKey="displayPercent" 
@@ -848,7 +851,8 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                             paddingAngle={2}
                             dataKey="value"
                             labelLine={true}
-                            isAnimationActive={false}
+                            isAnimationActive={true}
+                            animationDuration={800}
                             label={renderCustomPercentageLabel}
                             cursor="pointer"
                             onClick={(entry) => setSelectedClassification((prev) => prev === entry.name ? null : entry.name)}
@@ -888,8 +892,8 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                         <YAxis allowDecimals={false} />
                         <Tooltip />
                         <Legend />
-                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
-                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={true} animationDuration={800} />
+                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={true} animationDuration={800} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -937,7 +941,8 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                               paddingAngle={3}
                               dataKey="count"
                               labelLine={true}
-                              isAnimationActive={false}
+                              isAnimationActive={true}
+                              animationDuration={800}
                               label={renderAgingPercentageLabel}
                             >
                               {agingData.map((entry, idx) => (
@@ -989,7 +994,7 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                         <XAxis dataKey="location" interval={0} angle={-30} textAnchor="end" height={50} />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={800} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -1149,7 +1154,6 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                   })}
                 </div>
 
-                {/* Staggered Animated Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
                   {healthRatioData.map((item, idx) => (
                     <div

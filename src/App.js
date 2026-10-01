@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, memo } from 'react';
 import './App.css';
 import { supabase } from './supabaseClient';
 import LandingPage from './components/LandingPage';
@@ -75,6 +75,73 @@ const MiniAnalogClock = ({ time = new Date() }) => {
   );
 };
 
+// Self-contained Clock Badge (Isolates the 1-second interval so App does not re-render)
+const HeaderClockBadge = memo(() => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Exact 12-Hour Format Calculation
+  const rawHours = time.getHours() % 12 || 12;
+  const hours12 = String(rawHours).padStart(2, '0');
+  const minutes = String(time.getMinutes()).padStart(2, '0');
+  const seconds = String(time.getSeconds()).padStart(2, '0');
+  const ampm = time.getHours() >= 12 ? 'PM' : 'AM';
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+      {/* 1. Standalone Circular Analog Clock Badge (Larger Face, Thinner Border) */}
+      <div
+        style={{
+          width: '50px',
+          height: '50px',
+          borderRadius: '50%',
+          backgroundColor: '#0d3b66',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 3px 10px rgba(13, 59, 102, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          flexShrink: 0
+        }}
+      >
+        <MiniAnalogClock time={time} />
+      </div>
+
+      {/* 2. Standalone Rectangular Digital Time & Date Badge (12-Hour Format) */}
+      <div
+        style={{
+          backgroundColor: '#0d3b66',
+          borderRadius: '12px',
+          padding: '7px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 3px 10px rgba(13, 59, 102, 0.2)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          lineHeight: 1.15
+        }}
+      >
+        <div style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.6px' }}>
+          {`${hours12}:${minutes}:${seconds}`}{' '}
+          <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>
+            {ampm}
+          </span>
+        </div>
+        <div style={{ fontSize: '10.5px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px', letterSpacing: '0.5px' }}>
+          {time.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -83,16 +150,6 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeTab, setActiveTab] = useState('home');
-
-  // Real-time Clock State for Header Badge
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Dynamic Orientation Detection: Portrait vs Landscape
   const checkIsPortrait = () => {
@@ -451,13 +508,6 @@ export default function App() {
     userProfile?.avatar_url || 
     session.user?.user_metadata?.avatar_url;
 
-  // Exact 12-Hour Format Calculation
-  const rawHours = currentTime.getHours() % 12 || 12;
-  const hours12 = String(rawHours).padStart(2, '0');
-  const minutes = String(currentTime.getMinutes()).padStart(2, '0');
-  const seconds = String(currentTime.getSeconds()).padStart(2, '0');
-  const ampm = currentTime.getHours() >= 12 ? 'PM' : 'AM';
-
   return (
     <div className={`dashboard-container ${isPortrait ? 'is-portrait' : 'is-landscape'}`}>
       {/* Top Navigation Bar with Separated Analog Circle & Digital Date-Time Box */}
@@ -478,54 +528,8 @@ export default function App() {
           </button>
         </div>
 
-        {/* Separated Clock Layout: Circular Analog (Left) + Rectangular Digital (Right) */}
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
-          
-          {/* 1. Standalone Circular Analog Clock Badge (Larger Face, Thinner Border) */}
-          <div
-            style={{
-              width: '50px',
-              height: '50px',
-              borderRadius: '50%',
-              backgroundColor: '#0d3b66',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 3px 10px rgba(13, 59, 102, 0.25)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              flexShrink: 0
-            }}
-          >
-            <MiniAnalogClock time={currentTime} />
-          </div>
-
-          {/* 2. Standalone Rectangular Digital Time & Date Badge (12-Hour Format) */}
-          <div
-            style={{
-              backgroundColor: '#0d3b66',
-              borderRadius: '12px',
-              padding: '7px 18px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 3px 10px rgba(13, 59, 102, 0.2)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              lineHeight: 1.15
-            }}
-          >
-            <div style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.6px' }}>
-              {`${hours12}:${minutes}:${seconds}`}{' '}
-              <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>
-                {ampm}
-              </span>
-            </div>
-            <div style={{ fontSize: '10.5px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px', letterSpacing: '0.5px' }}>
-              {currentTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
-            </div>
-          </div>
-
-        </div>
+        {/* Isolated Clock Badge (App will NOT re-render on each tick) */}
+        <HeaderClockBadge />
 
         <div>
           {activeTab === 'home' ? (
