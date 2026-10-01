@@ -54,17 +54,16 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const [agingData, setAgingData] = useState([]);
   const [showAllLocations, setShowAllLocations] = useState(false);
 
-  // States Khusus Analisis Tempoh Penyelesaian & Kelewatan (HOD Monitoring)
-  const [hodMetrics, setHodMetrics] = useState({
-    avgDaysToClose: 0,
-    onTimeRate: 0,
-    delayedClosedCount: 0,
-    onTimeClosedCount: 0,
-    overdueActiveCount: 0,
-    totalClosed: 0
+  // HOD Executive Metrics: Lead Time & Delay
+  const [leadTimeComparisonData, setLeadTimeComparisonData] = useState([]);
+  const [hodSummary, setHodSummary] = useState({
+    avgActualDays: 0,
+    avgTargetDays: 0,
+    avgDelayDays: 0,
+    onTimeCount: 0,
+    delayedCount: 0,
+    closedTotal: 0
   });
-  const [groupLeadTimeData, setGroupLeadTimeData] = useState([]);
-  const [delayBreakdownData, setDelayBreakdownData] = useState([]);
 
   useEffect(() => {
     async function loadData() {
@@ -84,7 +83,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     return String(Math.min(5, Math.ceil(dayNumber / 7)));
   };
 
-  // Helper to recognize Closed status
+  // Helper to recognize closed status variants
   const isClosedStatus = (statusStr) => {
     if (!statusStr) return false;
     const s = String(statusStr).trim().toLowerCase();
@@ -98,6 +97,29 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     );
   };
 
+  // Safe date parsing supporting ISO, hyphenated, and slash-separated strings
+  const parseDateSafe = (dateStr) => {
+    if (!dateStr) return null;
+    try {
+      if (dateStr.includes('-')) {
+        const parts = dateStr.split('T')[0].split(' ')[0].split('-');
+        if (parts[0].length === 4) {
+          return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        } else {
+          return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        }
+      } else if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        const yearVal = parts[2].length === 2 ? Number('20' + parts[2]) : Number(parts[2]);
+        return new Date(yearVal, Number(parts[1]) - 1, Number(parts[0]));
+      }
+      const parsed = new Date(dateStr);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    } catch {
+      return null;
+    }
+  };
+
   const processDashboard = useCallback(() => {
     if (!rawIssues.length) {
       setStats({ total: 0, inProgress: 0, closed: 0 });
@@ -106,15 +128,14 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       setClassificationData([]);
       setTrendData([]);
       setAgingData([]);
-      setGroupLeadTimeData([]);
-      setDelayBreakdownData([]);
-      setHodMetrics({
-        avgDaysToClose: 0,
-        onTimeRate: 0,
-        delayedClosedCount: 0,
-        onTimeClosedCount: 0,
-        overdueActiveCount: 0,
-        totalClosed: 0
+      setLeadTimeComparisonData([]);
+      setHodSummary({
+        avgActualDays: 0,
+        avgTargetDays: 0,
+        avgDelayDays: 0,
+        onTimeCount: 0,
+        delayedCount: 0,
+        closedTotal: 0
       });
       return;
     }
@@ -166,7 +187,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       return true;
     });
 
-    // 2. Classification Distribution
+    // 2. Classification Distribution Map
     const classMap = {};
     dateAndGroupFiltered.forEach((item) => {
       const classKey = item.classification ? `Class ${item.classification.toUpperCase()}` : 'UNCLASSIFIED';
@@ -185,73 +206,72 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     let closedCount = 0;
     const locationMap = {};
     
-    // Aging breakdown
+    // Aging breakdown accumulators
     let agingHealthy = 0;
     let agingDueSoon = 0;
     let agingOverdue = 0;
 
-    // HOD Metrics Accumulators
-    let totalDaysToCloseAll = 0;
+    // Lead Time & Delay metric accumulators
+    let totalTargetDaysSum = 0;
+    let totalActualDaysSum = 0;
+    let totalDelayDaysSum = 0;
     let onTimeClosed = 0;
     let delayedClosed = 0;
-    const groupLeadTimeMap = {}; // { 'Cold Test': { totalDays: 0, count: 0 } }
+
+    const groupComparisonMap = {};
 
     fullyFiltered.forEach((item) => {
       const isDone = isClosedStatus(item.status);
-      const createdDate = new Date(item.date_time || item.created_at);
-      const closedDate = new Date(item.updated_at || item.date_time);
+      const openDate = parseDateSafe(item.date_time || item.created_at);
+      const estCloseDate = parseDateSafe(item.estimated_closing);
+      const actualClosedDate = parseDateSafe(item.updated_at || item.date_time);
       const grp = item.group_name || 'Others';
-
-      // Parse Est. Closing Date
-      let estDate = null;
-      const estStr = item.estimated_closing;
-      if (estStr) {
-        if (estStr.includes('-')) {
-          const parts = estStr.split('T')[0].split(' ')[0].split('-');
-          if (parts[0].length === 4) {
-            estDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-          } else {
-            estDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-          }
-        } else if (estStr.includes('/')) {
-          const parts = estStr.split('/');
-          const yearVal = parts[2].length === 2 ? Number('20' + parts[2]) : Number(parts[2]);
-          estDate = new Date(yearVal, Number(parts[1]) - 1, Number(parts[0]));
-        }
-      }
 
       if (isDone) {
         closedCount++;
-        
-        // Kira tempoh siap (Lead Time in Days)
-        const daysTaken = Math.max(0, Math.round((closedDate - createdDate) / (1000 * 60 * 60 * 24)));
-        totalDaysToCloseAll += daysTaken;
 
-        if (!groupLeadTimeMap[grp]) {
-          groupLeadTimeMap[grp] = { totalDays: 0, count: 0 };
-        }
-        groupLeadTimeMap[grp].totalDays += daysTaken;
-        groupLeadTimeMap[grp].count += 1;
+        if (openDate && actualClosedDate) {
+          // Actual resolution days (Closed - Open)
+          const actualDays = Math.max(0, Math.round((actualClosedDate - openDate) / (1000 * 60 * 60 * 24)));
+          
+          // Target planned days (Est. Closing - Open)
+          let targetDays = actualDays;
+          if (estCloseDate && estCloseDate >= openDate) {
+            targetDays = Math.max(1, Math.round((estCloseDate - openDate) / (1000 * 60 * 60 * 24)));
+          }
 
-        // Semak sama ada siap tepat pada masa atau lewat
-        if (estDate && !isNaN(estDate.getTime())) {
-          const delayDays = Math.round((closedDate - estDate) / (1000 * 60 * 60 * 24));
+          // Delay variance (Closed - Est. Closing)
+          let delayDays = 0;
+          if (estCloseDate) {
+            delayDays = Math.round((actualClosedDate - estCloseDate) / (1000 * 60 * 60 * 24));
+          }
+
           if (delayDays > 0) {
             delayedClosed++;
+            totalDelayDaysSum += delayDays;
           } else {
             onTimeClosed++;
           }
-        } else {
-          onTimeClosed++;
+
+          totalTargetDaysSum += targetDays;
+          totalActualDaysSum += actualDays;
+
+          if (!groupComparisonMap[grp]) {
+            groupComparisonMap[grp] = { targetTotal: 0, actualTotal: 0, delayTotal: 0, count: 0 };
+          }
+          groupComparisonMap[grp].targetTotal += targetDays;
+          groupComparisonMap[grp].actualTotal += actualDays;
+          groupComparisonMap[grp].delayTotal += Math.max(0, delayDays);
+          groupComparisonMap[grp].count += 1;
         }
 
       } else {
         inProgressCount++;
 
-        // Aging breakdown for ongoing / unresolved issues
-        if (estDate && !isNaN(estDate.getTime())) {
+        // Aging breakdown for open/pending issues
+        if (estCloseDate) {
           const todayClean = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          const targetClean = new Date(estDate.getFullYear(), estDate.getMonth(), estDate.getDate());
+          const targetClean = new Date(estCloseDate.getFullYear(), estCloseDate.getMonth(), estCloseDate.getDate());
           const diffDays = Math.ceil((targetClean.getTime() - todayClean.getTime()) / (1000 * 60 * 60 * 24));
 
           if (diffDays < 0) {
@@ -268,6 +288,29 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
       const loc = item.location ? item.location.toUpperCase() : 'UNKNOWN';
       locationMap[loc] = (locationMap[loc] || 0) + 1;
+    });
+
+    // Structure lead time comparison chart data sorted descending by actual days
+    const comparisonArray = Object.keys(groupComparisonMap).map((grp) => {
+      const g = groupComparisonMap[grp];
+      return {
+        group: grp,
+        'Target Days': Number((g.targetTotal / g.count).toFixed(1)),
+        'Actual Days': Number((g.actualTotal / g.count).toFixed(1)),
+        'Avg Delay': Number((g.delayTotal / g.count).toFixed(1)),
+        count: g.count
+      };
+    }).sort((a, b) => b['Actual Days'] - a['Actual Days']);
+
+    setLeadTimeComparisonData(comparisonArray);
+
+    setHodSummary({
+      avgTargetDays: closedCount > 0 ? (totalTargetDaysSum / closedCount).toFixed(1) : 0,
+      avgActualDays: closedCount > 0 ? (totalActualDaysSum / closedCount).toFixed(1) : 0,
+      avgDelayDays: delayedClosed > 0 ? (totalDelayDaysSum / delayedClosed).toFixed(1) : 0,
+      onTimeCount: onTimeClosed,
+      delayedCount: delayedClosed,
+      closedTotal: closedCount
     });
 
     // Monthly Trend
@@ -298,57 +341,13 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       closed: closedCount,
     });
 
-    // HOD Lead Time & Delay Calculation
-    const avgDays = closedCount > 0 ? (totalDaysToCloseAll / closedCount).toFixed(1) : 0;
-    const onTimePercentage = closedCount > 0 ? Math.round((onTimeClosed / closedCount) * 100) : 0;
-
-    setHodMetrics({
-      avgDaysToClose: Number(avgDays),
-      onTimeRate: onTimePercentage,
-      delayedClosedCount: delayedClosed,
-      onTimeClosedCount: onTimeClosed,
-      overdueActiveCount: agingOverdue,
-      totalClosed: closedCount
-    });
-
-    // Lead Time by Group Chart Data
-    const groupTimeArray = Object.keys(groupLeadTimeMap).map((grp) => ({
-      group: grp,
-      avgDays: Math.round(groupLeadTimeMap[grp].totalDays / groupLeadTimeMap[grp].count),
-      closedCount: groupLeadTimeMap[grp].count
-    })).sort((a, b) => b.avgDays - a.avgDays);
-
-    setGroupLeadTimeData(groupTimeArray);
-
-    // Performance Breakdown Pie Chart Data
-    setDelayBreakdownData([
-      { name: 'On-Time Closed', value: onTimeClosed, fill: '#16a34a' },
-      { name: 'Delayed Closed', value: delayedClosed, fill: '#ef4444' },
-      { name: 'Overdue Pending', value: agingOverdue, fill: '#f59e0b' }
-    ]);
-
     const closedPercent = totalCount > 0 ? Math.round((closedCount / totalCount) * 100) : 0;
     const inProgressPercent = totalCount > 0 ? Math.round((inProgressCount / totalCount) * 100) : 0;
 
     setStatusComboData([
-      {
-        status: 'Total',
-        count: totalCount,
-        percentage: 100,
-        fill: '#0d3b66'
-      },
-      {
-        status: 'Closed',
-        count: closedCount,
-        percentage: closedPercent,
-        fill: '#16a34a'
-      },
-      {
-        status: 'Ongoing',
-        count: inProgressCount,
-        percentage: inProgressPercent,
-        fill: '#ea580c'
-      }
+      { status: 'Total', count: totalCount, percentage: 100, fill: '#0d3b66' },
+      { status: 'Closed', count: closedCount, percentage: closedPercent, fill: '#16a34a' },
+      { status: 'Ongoing', count: inProgressCount, percentage: inProgressPercent, fill: '#ea580c' }
     ]);
 
     setClassificationData(
@@ -545,7 +544,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         </div>
       </div>
 
-      {/* Slicer Indicator */}
+      {/* Cross-Filter Slicer Indicator */}
       {selectedClassification && (
         <div style={{ backgroundColor: '#e2e8f0', padding: '10px 15px', borderRadius: '6px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>Filtered by: <strong>{selectedClassification}</strong></span>
@@ -588,118 +587,123 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
           </div>
 
           {/* =========================================================
-             2. SEKSYEN KHAS HOD: Resolution Lead Time & Delay Monitoring
+             2. HOD EXECUTIVE SECTION: Lead Time vs Target & Delay Analysis
              ========================================================= */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '25px', borderTop: '4px solid #0d3b66' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
               <div>
                 <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⏱️</span> Resolution Lead Time & Delay Monitoring (HOD View)
+                  <span>⏱️</span> Issue Resolution Lead Time & Delay Analysis (HOD View)
                 </h3>
-                <small style={{ color: '#64748b' }}>Pemantauan tempoh penyelesaian isu dan kadar kelewatan berbanding Est. Closing Date</small>
+                <small style={{ color: '#64748b' }}>
+                  Comparison between target schedule (Plan), actual resolution time taken, and delay variance
+                </small>
               </div>
             </div>
 
-            {/* 4 Kad Metrik Utama HOD */}
+            {/* 4 Executive KPI Metric Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px', marginBottom: '22px' }}>
               
-              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold', display: 'block' }}>AVG LEAD TIME TO CLOSE</span>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#15803d' }}>
-                  {hodMetrics.avgDaysToClose} <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Days</span>
+              <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
+                <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold', display: 'block' }}>AVG ACTUAL RESOLUTION TIME</span>
+                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#1d4ed8' }}>
+                  {hodSummary.avgActualDays} <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Days</span>
                 </h3>
-                <small style={{ fontSize: '10px', color: '#166534' }}>Berasaskan {hodMetrics.totalClosed} isu selesai</small>
+                <small style={{ fontSize: '10px', color: '#1e40af' }}>Based on {hodSummary.closedTotal} closed issues</small>
               </div>
 
-              <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#1e40af', fontWeight: 'bold', display: 'block' }}>ON-TIME RESOLUTION RATE</span>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#1d4ed8' }}>
-                  {hodMetrics.onTimeRate}%
+              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
+                <span style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold', display: 'block' }}>AVG PLANNED TARGET TIME</span>
+                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#15803d' }}>
+                  {hodSummary.avgTargetDays} <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Days</span>
                 </h3>
-                <small style={{ fontSize: '10px', color: '#1e40af' }}>{hodMetrics.onTimeClosedCount} daripada {hodMetrics.totalClosed} selesai ikut sasaran</small>
+                <small style={{ fontSize: '10px', color: '#166534' }}>Baseline Est. Closing duration</small>
               </div>
 
               <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#991b1b', fontWeight: 'bold', display: 'block' }}>DELAYED CLOSED ISSUES</span>
+                <span style={{ fontSize: '11px', color: '#991b1b', fontWeight: 'bold', display: 'block' }}>AVG SCHEDULE DELAY</span>
                 <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#b91c1c' }}>
-                  {hodMetrics.delayedClosedCount}
+                  +{hodSummary.avgDelayDays} <span style={{ fontSize: '14px', fontWeight: 'normal' }}>Days</span>
                 </h3>
-                <small style={{ fontSize: '10px', color: '#991b1b' }}>Selesai tetapi lewat dari Est. Closing</small>
+                <small style={{ fontSize: '10px', color: '#991b1b' }}>For {hodSummary.delayedCount} overdue closed issues</small>
               </div>
 
-              <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#92400e', fontWeight: 'bold', display: 'block' }}>ACTIVE OVERDUE BACKLOG</span>
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#b45309' }}>
-                  {hodMetrics.overdueActiveCount}
+              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', padding: '14px', borderRadius: '6px', textAlign: 'center' }}>
+                <span style={{ fontSize: '11px', color: '#334155', fontWeight: 'bold', display: 'block' }}>ON-TIME RESOLUTION RATE</span>
+                <h3 style={{ margin: '6px 0 0 0', fontSize: '24px', color: '#0d3b66' }}>
+                  {hodSummary.closedTotal > 0 ? Math.round((hodSummary.onTimeCount / hodSummary.closedTotal) * 100) : 0}%
                 </h3>
-                <small style={{ fontSize: '10px', color: '#92400e' }}>Isu aktif yang telah melepasi sasaran</small>
+                <small style={{ fontSize: '10px', color: '#64748b' }}>{hodSummary.onTimeCount} On-Time / {hodSummary.delayedCount} Delayed</small>
               </div>
 
             </div>
 
-            {/* Graf HOD: Purata Hari Mengikut Kumpulan (Bar) & Pecahan Prestasi (Pie) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-              
-              {/* Carta Purata Hari Penyelesaian Mengikut Kumpulan */}
-              <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#0d3b66' }}>
-                  📊 Average Days to Resolve Issues by Group
+            {/* Target Days vs Actual Days vs Delay Line Chart */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '18px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '6px' }}>
+                <h4 style={{ margin: 0, fontSize: '14px', color: '#0d3b66' }}>
+                  📊 Planned Target vs Actual Days by Group
                 </h4>
-                {groupLeadTimeData.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: '12px' }}>
-                    Tiada isu selesai untuk dikira purata tempoh penyelesaian.
-                  </div>
-                ) : (
-                  <div style={{ width: '100%', height: '240px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={groupLeadTimeData} margin={{ top: 15, right: 20, left: -10, bottom: 25 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="group" interval={0} angle={-25} textAnchor="end" height={45} tick={{ fontSize: 11, fontWeight: 'bold' }} />
-                        <YAxis allowDecimals={false} unit="d" />
-                        <Tooltip formatter={(val, name, item) => [`${val} Hari (Purata)`, `Selesai: ${item.payload.closedCount} isu`]} />
-                        <Bar dataKey="avgDays" name="Purata Hari" fill="#0284c7" radius={[4, 4, 0, 0]}>
-                          {groupLeadTimeData.map((entry, index) => (
-                            <Cell 
-                              key={`cell-lead-${index}`} 
-                              fill={entry.avgDays > 14 ? '#ef4444' : entry.avgDays > 7 ? '#f59e0b' : '#10b981'} 
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
+                <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
+                  *Actual Days exceeding Target Days indicates schedule delay
+                </span>
               </div>
 
-              {/* Carta Pecahan Prestasi: On-Time vs Delayed vs Active Overdue */}
-              <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#0d3b66' }}>
-                  🎯 Resolution Efficiency & Delay Ratio
-                </h4>
-                <div style={{ width: '100%', height: '240px' }}>
+              {leadTimeComparisonData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '80px 0', color: '#94a3b8', fontSize: '12px' }}>
+                  No closed issue records found within the selected filters.
+                </div>
+              ) : (
+                <div style={{ width: '100%', height: '320px' }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={delayBreakdownData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={45}
-                        outerRadius={70}
-                        paddingAngle={3}
-                        dataKey="value"
-                        label={renderCustomPercentageLabel}
-                      >
-                        {delayBreakdownData.map((entry, index) => (
-                          <Cell key={`delay-cell-${index}`} fill={entry.fill} stroke="#fff" strokeWidth={2} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(val, name) => [`${val} Isu`, name]} />
-                      <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
-                    </PieChart>
+                    <ComposedChart data={leadTimeComparisonData} margin={{ top: 20, right: 30, left: 0, bottom: 25 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis 
+                        dataKey="group" 
+                        interval={0} 
+                        angle={-20} 
+                        textAnchor="end" 
+                        height={45} 
+                        tick={{ fontSize: 11, fontWeight: 'bold' }} 
+                      />
+                      <YAxis allowDecimals={false} unit=" d" />
+                      
+                      <Tooltip 
+                        formatter={(val, name) => [`${val} Days`, name]}
+                      />
+                      <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px', fontSize: '12px' }} />
+
+                      {/* Planned Target Bar */}
+                      <Bar 
+                        dataKey="Target Days" 
+                        fill="#0284c7" 
+                        name="Planned Target (Days)" 
+                        barSize={26}
+                        radius={[4, 4, 0, 0]} 
+                      />
+
+                      {/* Actual Duration Bar */}
+                      <Bar 
+                        dataKey="Actual Days" 
+                        fill="#f97316" 
+                        name="Actual Resolution (Days)" 
+                        barSize={26}
+                        radius={[4, 4, 0, 0]} 
+                      />
+
+                      {/* Average Delay Line */}
+                      <Line 
+                        type="monotone" 
+                        dataKey="Avg Delay" 
+                        stroke="#dc2626" 
+                        strokeWidth={3} 
+                        name="Average Delay (+Days)" 
+                        dot={{ r: 5, fill: '#dc2626' }}
+                      />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
-
+              )}
             </div>
           </div>
 
@@ -774,7 +778,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
               <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
                   <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
-                    🏷️️ Classification (Click slice to cross-filter)
+                    🏷 Classification (Click slice to cross-filter)
                   </h3>
                 </div>
                 <div style={{ width: '100%', height: '280px' }}>
