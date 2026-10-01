@@ -451,6 +451,13 @@ export default function App() {
     userProfile?.avatar_url || 
     session.user?.user_metadata?.avatar_url;
 
+  // Exact 12-Hour Format Calculation
+  const rawHours = currentTime.getHours() % 12 || 12;
+  const hours12 = String(rawHours).padStart(2, '0');
+  const minutes = String(currentTime.getMinutes()).padStart(2, '0');
+  const seconds = String(currentTime.getSeconds()).padStart(2, '0');
+  const ampm = currentTime.getHours() >= 12 ? 'PM' : 'AM';
+
   return (
     <div className={`dashboard-container ${isPortrait ? 'is-portrait' : 'is-landscape'}`}>
       {/* Top Navigation Bar with Separated Analog Circle & Digital Date-Time Box */}
@@ -492,7 +499,7 @@ export default function App() {
             <MiniAnalogClock time={currentTime} />
           </div>
 
-          {/* 2. Standalone Rectangular Digital Time & Date Badge */}
+          {/* 2. Standalone Rectangular Digital Time & Date Badge (12-Hour Format) */}
           <div
             style={{
               backgroundColor: '#0d3b66',
@@ -508,9 +515,9 @@ export default function App() {
             }}
           >
             <div style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.6px' }}>
-              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}{' '}
+              {`${hours12}:${minutes}:${seconds}`}{' '}
               <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>
-                {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
+                {ampm}
               </span>
             </div>
             <div style={{ fontSize: '10.5px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px', letterSpacing: '0.5px' }}>
@@ -604,7 +611,7 @@ export default function App() {
 
           <div className="menu-card card-create" onClick={() => navigateTo('create')}>
             <div className="card-overlay">
-              <h3>Add New Issue</h3>
+              <h3>Specify an Issue</h3>
             </div>
           </div>
 
