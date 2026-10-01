@@ -8,10 +8,72 @@ import IssueList from './components/IssueList';
 import TagMapUpdates from './components/TagMap';
 import DashboardAnalytics from './components/DashboardAnalytics';
 import EditProfileModal from './components/EditProfileModal';
-import LiveDateTime from './components/LiveDateTime';
 import LanguageSelector from './components/LanguageSelector';
 
-const TIMEOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes (300,000 ms)
+const TIMEOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes inactivity timeout (300,000 ms)
+
+// Clean Vector Mini Analog Clock Component
+const MiniAnalogClock = ({ time = new Date() }) => {
+  const seconds = time.getSeconds();
+  const minutes = time.getMinutes();
+  const hours = time.getHours() % 12;
+
+  const secAngle = seconds * 6; // 360deg / 60s
+  const minAngle = minutes * 6 + seconds * 0.1; // 360deg / 60m
+  const hourAngle = hours * 30 + minutes * 0.5; // 360deg / 12h
+
+  return (
+    <svg width="34" height="34" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+      {/* Outer Dial Face */}
+      <circle cx="50" cy="50" r="45" fill="#092540" stroke="#38bdf8" strokeWidth="3" />
+
+      {/* Hour Markers (12, 3, 6, 9) */}
+      <line x1="50" y1="10" x2="50" y2="17" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+      <line x1="90" y1="50" x2="83" y2="50" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+      <line x1="50" y1="90" x2="50" y2="83" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+      <line x1="10" y1="50" x2="17" y2="50" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+
+      {/* Hour Hand */}
+      <line
+        x1="50"
+        y1="50"
+        x2="50"
+        y2="28"
+        stroke="#ffffff"
+        strokeWidth="5"
+        strokeLinecap="round"
+        transform={`rotate(${hourAngle} 50 50)`}
+      />
+
+      {/* Minute Hand */}
+      <line
+        x1="50"
+        y1="50"
+        x2="50"
+        y2="18"
+        stroke="#38bdf8"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        transform={`rotate(${minAngle} 50 50)`}
+      />
+
+      {/* Second Hand (Red Accent) */}
+      <line
+        x1="50"
+        y1="56"
+        x2="50"
+        y2="14"
+        stroke="#ef4444"
+        strokeWidth="2"
+        strokeLinecap="round"
+        transform={`rotate(${secAngle} 50 50)`}
+      />
+
+      {/* Center Pivot Pin */}
+      <circle cx="50" cy="50" r="3.5" fill="#ffffff" />
+    </svg>
+  );
+};
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -22,7 +84,17 @@ export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeTab, setActiveTab] = useState('home');
 
-  // Pengesanan Orientasi Dinamik: Potret vs Landskap
+  // Real-time Clock State for Header Badge
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Dynamic Orientation Detection: Portrait vs Landscape
   const checkIsPortrait = () => {
     return window.innerHeight > window.innerWidth || window.innerWidth <= 768;
   };
@@ -43,7 +115,7 @@ export default function App() {
     };
   }, []);
 
-  // Tangkap issueId seawal render pertama dan simpan secara selamat
+  // Capture issueId parameter upon initial mount and persist safely
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const targetIssueId = searchParams.get('issueId');
@@ -69,7 +141,7 @@ export default function App() {
     setSession(null);
   }, []);
 
-  // Strict 5-Minute Inactivity Auto-Logout (Silent)
+  // Strict 5-Minute Inactivity Auto-Logout
   useEffect(() => {
     if (!session) return;
 
@@ -121,7 +193,6 @@ export default function App() {
       const currentHash = window.location.hash.replace('#/', '').replace('#', '');
 
       if (!session) {
-        // Jika belum ada sesi dan ada issueId, terus buka modal log masuk
         if (pendingIssueId || currentHash === 'login') {
           setShowAuthModal(true);
         } else {
@@ -130,7 +201,6 @@ export default function App() {
         return;
       }
 
-      // Jika ada isu yang menunggu dan sesi telah wujud, halakan terus ke tab list
       if (pendingIssueId) {
         window.history.replaceState(null, '', `/?issueId=${pendingIssueId}#/list`);
         setActiveTab('list');
@@ -383,7 +453,7 @@ export default function App() {
 
   return (
     <div className={`dashboard-container ${isPortrait ? 'is-portrait' : 'is-landscape'}`}>
-      {/* Top Navigation Bar with Centered LiveDateTime */}
+      {/* Top Navigation Bar with Analog Clock & Live Digital Time Badge */}
       <div 
         className="top-nav" 
         style={{ 
@@ -401,9 +471,34 @@ export default function App() {
           </button>
         </div>
 
-        {/* Live Digital Clock & Date */}
-        <div>
-          <LiveDateTime />
+        {/* Live Clock Badge: Analog Clock on Left + Digital Date & Time on Right */}
+        <div
+          style={{
+            backgroundColor: '#0d3b66',
+            borderRadius: '12px',
+            padding: '7px 16px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '12px',
+            boxShadow: '0 3px 10px rgba(13, 59, 102, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.12)'
+          }}
+        >
+          {/* Mini Analog Clock on Left */}
+          <MiniAnalogClock time={currentTime} />
+
+          {/* Digital Time & Date on Right */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.15 }}>
+            <div style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.6px' }}>
+              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}{' '}
+              <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 'bold' }}>
+                {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
+              </span>
+            </div>
+            <div style={{ fontSize: '10.5px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px', letterSpacing: '0.5px' }}>
+              {currentTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase()}
+            </div>
+          </div>
         </div>
 
         <div>
@@ -476,8 +571,8 @@ export default function App() {
 
               <div className="welcome-text">
                 <div className="welcome-title">Welcome,</div>
-                <div className="user-name">{displayName}</div>
-                <div className="staff-id-text">({staffIdDisplay})</div>
+                <div className="user-name notranslate" translate="no">{displayName}</div>
+                <div className="staff-id-text notranslate" translate="no">({staffIdDisplay})</div>
               </div>
             </div>
           </div>
@@ -490,7 +585,7 @@ export default function App() {
 
           <div className="menu-card card-create" onClick={() => navigateTo('create')}>
             <div className="card-overlay">
-              <h3>Add New Issue</h3>
+              <h3>Specify an Issue</h3>
             </div>
           </div>
 
