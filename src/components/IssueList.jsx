@@ -17,12 +17,6 @@ const DEFAULT_STAGES = {
   '4/4': { progress: '', remark: '', links: [] }
 };
 
-// Helper: Semak jika mod bahasa sekarang adalah Bahasa Melayu
-const isMalaySelected = () => {
-  if (typeof document === 'undefined') return false;
-  return document.cookie.includes('googtrans=/en/ms') || document.documentElement.lang === 'ms';
-};
-
 export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger }) {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +26,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
   const [dbStations, setDbStations] = useState([]);
   const [dbVariants, setDbVariants] = useState([]);
 
-  // Filters: Date - Status - Class - Group - Location - Engine Variant - Name
+  // Filters: Date - Status - Class - Group - Location - Engine Variant - Reporter
   const [searchTerm, setSearchTerm] = useState('');
   const [periodFilter, setPeriodFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -40,7 +34,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
   const [groupFilter, setGroupFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState('All');
   const [engineVariantFilter, setEngineVariantFilter] = useState('All');
-  const [nameFilter, setNameFilter] = useState('All');
+  const [reporterFilter, setReporterFilter] = useState('All');
 
   // Est. Closing Inline Edit
   const [editingEstClosingId, setEditingEstClosingId] = useState(null);
@@ -200,7 +194,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     return Array.from(new Set([...dbVariants, ...fromIssues])).sort();
   }, [dbVariants, issues]);
 
-  const uniqueNames = useMemo(() => {
+  const uniqueReporters = useMemo(() => {
     return Array.from(new Set(issues.map((i) => i.staff_name || i.staff_id).filter(Boolean))).sort();
   }, [issues]);
 
@@ -461,7 +455,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
       setGroupFilter('All');
       setLocationFilter('All');
       setEngineVariantFilter('All');
-      setNameFilter('All');
+      setReporterFilter('All');
 
       if (checkCanEdit(targetIssue)) {
         handleOpenUpdateModal(targetIssue);
@@ -663,10 +657,10 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
         matchesEngineVariant = issue.engine_variant === engineVariantFilter;
       }
 
-      let matchesName = true;
-      if (nameFilter !== 'All') {
-        const combinedName = issue.staff_name || issue.staff_id;
-        matchesName = combinedName === nameFilter;
+      let matchesReporter = true;
+      if (reporterFilter !== 'All') {
+        const combinedReporter = issue.staff_name || issue.staff_id;
+        matchesReporter = combinedReporter === reporterFilter;
       }
 
       return (
@@ -677,7 +671,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
         matchesGroup &&
         matchesLocation &&
         matchesEngineVariant &&
-        matchesName
+        matchesReporter
       );
     })
     .sort((a, b) => {
@@ -810,8 +804,6 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     const groupLabel = groupFilter === 'All' ? 'All_Groups' : groupFilter.replace(/\s+/g, '_');
     XLSX.writeFile(workbook, `Issues_Report_${groupLabel}_${currentPeriodLabel}_${today}.xlsx`);
   };
-
-  const isMalay = isMalaySelected();
 
   return (
     <div style={{ padding: '10px 20px', maxWidth: '1280px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
@@ -959,7 +951,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 4. Group Filter: Protected from translation */}
+          {/* 4. Group Filter */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               👥 Group:
@@ -982,7 +974,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 5. Location: Protected from translation */}
+          {/* 5. Location */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               📍 Location:
@@ -1001,7 +993,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 6. Engine Variant: Protected from translation */}
+          {/* 6. Engine Variant */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
               ⚙️ Engine Variant:
@@ -1020,21 +1012,21 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
             </select>
           </div>
 
-          {/* 7. Name: Protected from translation */}
+          {/* 7. Reporter Filter (Renamed from Name) */}
           <div style={{ minWidth: '0' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '4px', whiteSpace: 'nowrap' }}>
-              👤 Name:
+              👤 Reporter:
             </label>
             <select
-              value={nameFilter}
-              onChange={(e) => setNameFilter(e.target.value)}
+              value={reporterFilter}
+              onChange={(e) => setReporterFilter(e.target.value)}
               className="notranslate"
               translate="no"
               style={{ width: '100%', padding: '6px 4px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '11px', backgroundColor: '#fff', boxSizing: 'border-box', cursor: 'pointer' }}
             >
-              <option value="All">All Names</option>
-              {uniqueNames.map((nm) => (
-                <option key={nm} value={nm}>{nm}</option>
+              <option value="All">All Reporters</option>
+              {uniqueReporters.map((rep) => (
+                <option key={rep} value={rep}>{rep}</option>
               ))}
             </select>
           </div>
@@ -1112,13 +1104,13 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     </div>
                   )}
 
-                  {/* Protected Fields: Group, Name, Location, Engine Variant, PIC */}
+                  {/* Protected Fields: Group, Reporter (Renamed from Name), Location, Engine Variant, PIC */}
                   <div style={{ fontSize: '12px', color: '#444', display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
                     <div>
                       👥 <b>Group:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.group_name || '-'}</span>
                     </div>
                     <div>
-                      👤 <b>Name:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.staff_name || issue.staff_id || '-'}</span>
+                      👤 <b>Reporter:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.staff_name || issue.staff_id || '-'}</span>
                     </div>
                     <div>
                       📍 <b>Location:</b> <span className="notranslate" translate="no" style={{ fontWeight: '600' }}>{issue.location || '-'}</span>
@@ -1175,13 +1167,13 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                       )}
                     </div>
 
-                    {/* Overall Root Cause & Countermeasure (= Langkah Balas for Malay) */}
+                    {/* Overall Root Cause & Countermeasure */}
                     {(matrix.root_cause || matrix.countermeasure) && (
                       <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '6px 8px', marginTop: '6px', fontSize: '11px' }}>
                         {matrix.root_cause && <div>🔍 <b>Root Cause:</b> {matrix.root_cause}</div>}
                         {matrix.countermeasure && (
                           <div style={{ marginTop: '3px' }}>
-                            🛠️ <b>{isMalay ? 'Langkah Balas:' : 'Countermeasure:'}</b> {matrix.countermeasure}
+                            🛠️ <b>Countermeasure:</b> {matrix.countermeasure}
                           </div>
                         )}
                       </div>
@@ -1354,7 +1346,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
               {/* 1. Root Cause & Countermeasure */}
               <div style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '6px', padding: '12px', marginBottom: '16px' }}>
                 <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#1e3a8a', display: 'block', marginBottom: '8px' }}>
-                  📋 Overall Root Cause & {isMalay ? 'Langkah Balas' : 'Countermeasure'}:
+                  📋 Overall Root Cause & Countermeasure:
                 </span>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '10px' }}>
@@ -1373,7 +1365,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
 
                   <div>
                     <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#1e3a8a', display: 'block', marginBottom: '3px' }}>
-                      {isMalay ? 'Langkah Balas:' : 'Countermeasure:'}
+                      Countermeasure:
                     </label>
                     <textarea
                       rows="2"
@@ -1424,7 +1416,6 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     {activeStageTab === '4/4' ? 'Action & Verification for Closed (4/4):' : `Progress & Remark for In Progress ${activeStageTab}:`}
                   </span>
 
-                  {/* Manual Forward Button */}
                   {activeStageTab !== '2/4' && (
                     <button
                       type="button"
