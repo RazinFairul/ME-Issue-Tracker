@@ -471,7 +471,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       if (listStatusFilter === 'all_active' && item.isDone) return false;
 
       // 5. Search Query
-      const q = listSearchQuery.toLowerCase();
+      const q = listSearchQuery.toLowerCase().trim();
       if (!q) return true;
 
       return (
@@ -485,30 +485,27 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [individualIssueMetrics, listSearchQuery, listStatusFilter, listGroupFilter, listReporterFilter, listStationFilter]);
 
-  // Graf Agregat Skala Besar: Taburan Julat Kelewatan (Scalable for thousands of issues)
-  const delayBracketData = useMemo(() => {
-    let onTime = 0;
-    let d1to3 = 0;
-    let d4to7 = 0;
-    let dOver7 = 0;
+  // Data Analisis Skala Besar: Taburan Peratusan Kesihatan Masa (Gauge / Pie Data)
+  const healthRatioData = useMemo(() => {
+    let onTimeCount = 0;
+    let delayedClosedCount = 0;
+    let activeOverdueCount = 0;
+    let activeOnTrackCount = 0;
 
     filteredIndividualIssues.forEach((item) => {
-      if (item.delayDays <= 0) {
-        onTime++;
-      } else if (item.delayDays <= 3) {
-        d1to3++;
-      } else if (item.delayDays <= 7) {
-        d4to7++;
-      } else {
-        dOver7++;
-      }
+      if (item.statusCategory === 'Resolved (On-Time)') onTimeCount++;
+      else if (item.statusCategory === 'Resolved (Delayed)') delayedClosedCount++;
+      else if (item.statusCategory === 'Overdue (Active)') activeOverdueCount++;
+      else activeOnTrackCount++;
     });
 
+    const total = filteredIndividualIssues.length || 1;
+
     return [
-      { range: 'On-Time / No Delay', count: onTime, fill: '#16a34a' },
-      { range: '1 - 3 Days Delay', count: d1to3, fill: '#eab308' },
-      { range: '4 - 7 Days Delay', count: d4to7, fill: '#f97316' },
-      { range: '> 7 Days (Critical)', count: dOver7, fill: '#dc3545' },
+      { name: 'Resolved On-Time', count: onTimeCount, percent: Math.round((onTimeCount / total) * 100), color: '#16a34a' },
+      { name: 'Active On-Track', count: activeOnTrackCount, percent: Math.round((activeOnTrackCount / total) * 100), color: '#0284c7' },
+      { name: 'Resolved Delayed', count: delayedClosedCount, percent: Math.round((delayedClosedCount / total) * 100), color: '#f59e0b' },
+      { name: 'Critical Overdue', count: activeOverdueCount, percent: Math.round((activeOverdueCount / total) * 100), color: '#dc3545' },
     ];
   }, [filteredIndividualIssues]);
 
@@ -1006,7 +1003,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           {/* =========================================================
              VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
-             Clean Table with Filters for Group, Reporter, Station & Status
+             Clean Multi-Filter Table + Executive Delay Health Bar
              ========================================================= */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -1023,10 +1020,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* Search Input */}
+                  {/* Search Input with clean "Search..." placeholder */}
                   <input
                     type="text"
-                    placeholder="Search title, PIC..."
+                    placeholder="Search..."
                     value={listSearchQuery}
                     onChange={(e) => setListSearchQuery(e.target.value)}
                     style={{
@@ -1034,7 +1031,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                       borderRadius: '5px',
                       border: '1px solid #cbd5e1',
                       fontSize: '12px',
-                      width: '180px',
+                      width: '160px',
                       outline: 'none'
                     }}
                   />
@@ -1134,31 +1131,59 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
               </div>
 
-              {/* Graf Agregat Skala Besar: Taburan Julat Kelewatan (Sangat sesuai untuk ribuan data) */}
-              <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                  <h4 style={{ margin: 0, fontSize: '13px', color: '#0d3b66' }}>
-                    📊 Overall Delay Distribution Breakdown (Active Filters: {filteredIndividualIssues.length} issues)
-                  </h4>
-                  <span style={{ fontSize: '10px', color: '#64748b' }}>
-                    Menunjukkan pecahan kelewatan isu sama ada tepat pada masa, lewat 1-3 hari, 4-7 hari, atau kritikal (>7 hari)
+              {/* Scalable Visual Tracker: Health Status & Composition Ratio Bar */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '16px 20px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '6px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0d3b66' }}>
+                    📊 Overall Issue Resolution Health Breakdown
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                    {filteredIndividualIssues.length} issues in active filter
                   </span>
                 </div>
 
-                <div style={{ width: '100%', height: '170px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={delayBracketData} margin={{ top: 15, right: 20, left: -10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="range" tick={{ fontSize: 11, fontWeight: 'bold' }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(val) => [`${val} Issues`, 'Total']} />
-                      <Bar dataKey="count" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: '#0d3b66', fontSize: 11, fontWeight: 'bold' }}>
-                        {delayBracketData.map((entry, index) => (
-                          <Cell key={`bracket-cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                {/* Horizontal Composition Progress Bar */}
+                <div style={{ display: 'flex', width: '100%', height: '14px', borderRadius: '7px', overflow: 'hidden', backgroundColor: '#e2e8f0', marginBottom: '12px' }}>
+                  {healthRatioData.map((item, idx) => {
+                    if (item.percent === 0) return null;
+                    return (
+                      <div
+                        key={`ratio-bar-${idx}`}
+                        style={{
+                          width: `${item.percent}%`,
+                          backgroundColor: item.color,
+                          transition: 'width 0.4s ease'
+                        }}
+                        title={`${item.name}: ${item.count} issues (${item.percent}%)`}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Legend Pill Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+                  {healthRatioData.map((item, idx) => (
+                    <div
+                      key={`health-card-${idx}`}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.color, flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 'bold' }}>{item.name}</div>
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#1e293b' }}>
+                          {item.count} <span style={{ fontSize: '10px', fontWeight: 'normal', color: '#64748b' }}>({item.percent}%)</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
