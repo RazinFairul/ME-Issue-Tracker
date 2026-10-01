@@ -53,6 +53,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
   const [listStatusFilter, setListStatusFilter] = useState('all');
   const [listGroupFilter, setListGroupFilter] = useState('all');
   const [listReporterFilter, setListReporterFilter] = useState('all');
+  const [listStationFilter, setListStationFilter] = useState('all');
 
   // Display States
   const [stats, setStats] = useState({ total: 0, inProgress: 0, closed: 0 });
@@ -226,6 +227,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         closedDateRaw: isDone ? (issue.updated_at || issue.date_time) : null,
         estDateRaw: issue.estimated_closing,
         reporterName: issue.staff_name || issue.staff_id || '-',
+        stationName: issue.location ? issue.location.toUpperCase() : '-',
         actualDays,
         targetDays,
         delayDays,
@@ -234,7 +236,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [dateAndGroupFiltered]);
 
-  // Dynamic unique reporters & groups for table filter dropdowns
+  // Dynamic unique lists for table filters
   const uniqueReporters = useMemo(() => {
     const names = individualIssueMetrics
       .map((i) => i.reporterName)
@@ -247,6 +249,13 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       .map((i) => i.group_name)
       .filter((g) => g && g !== '-');
     return Array.from(new Set(groups)).sort();
+  }, [individualIssueMetrics]);
+
+  const uniqueStations = useMemo(() => {
+    const stations = individualIssueMetrics
+      .map((i) => i.stationName)
+      .filter((s) => s && s !== '-');
+    return Array.from(new Set(stations)).sort();
   }, [individualIssueMetrics]);
 
   const processDashboard = useCallback(() => {
@@ -448,7 +457,12 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         if (item.reporterName !== listReporterFilter) return false;
       }
 
-      // 3. Status Filter (In-table)
+      // 3. Station Filter (In-table)
+      if (listStationFilter !== 'all') {
+        if (item.stationName !== listStationFilter) return false;
+      }
+
+      // 4. Status Filter (In-table)
       if (listStatusFilter === 'closed_ontime' && item.statusCategory !== 'Resolved (On-Time)') return false;
       if (listStatusFilter === 'closed_delayed' && item.statusCategory !== 'Resolved (Delayed)') return false;
       if (listStatusFilter === 'active_overdue' && item.statusCategory !== 'Overdue (Active)') return false;
@@ -456,7 +470,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       if (listStatusFilter === 'all_closed' && !item.isDone) return false;
       if (listStatusFilter === 'all_active' && item.isDone) return false;
 
-      // 4. Search Query
+      // 5. Search Query
       const q = listSearchQuery.toLowerCase();
       if (!q) return true;
 
@@ -469,7 +483,34 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         (item.pic && item.pic.toLowerCase().includes(q))
       );
     });
-  }, [individualIssueMetrics, listSearchQuery, listStatusFilter, listGroupFilter, listReporterFilter]);
+  }, [individualIssueMetrics, listSearchQuery, listStatusFilter, listGroupFilter, listReporterFilter, listStationFilter]);
+
+  // Graf Agregat Skala Besar: Taburan Julat Kelewatan (Scalable for thousands of issues)
+  const delayBracketData = useMemo(() => {
+    let onTime = 0;
+    let d1to3 = 0;
+    let d4to7 = 0;
+    let dOver7 = 0;
+
+    filteredIndividualIssues.forEach((item) => {
+      if (item.delayDays <= 0) {
+        onTime++;
+      } else if (item.delayDays <= 3) {
+        d1to3++;
+      } else if (item.delayDays <= 7) {
+        d4to7++;
+      } else {
+        dOver7++;
+      }
+    });
+
+    return [
+      { range: 'On-Time / No Delay', count: onTime, fill: '#16a34a' },
+      { range: '1 - 3 Days Delay', count: d1to3, fill: '#eab308' },
+      { range: '4 - 7 Days Delay', count: d4to7, fill: '#f97316' },
+      { range: '> 7 Days (Critical)', count: dOver7, fill: '#dc3545' },
+    ];
+  }, [filteredIndividualIssues]);
 
   const renderCustomPercentageLabel = ({ cx, cy, midAngle, outerRadius, percent, value }) => {
     if (!value || percent === 0) return null;
@@ -965,7 +1006,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
 
           {/* =========================================================
              VIEW 2: ISSUE-BY-ISSUE LEAD TIME & DELAY TRACKER (HOD)
-             Clean Table with In-Table Filter for Group, Reporter & Status
+             Clean Table with Filters for Group, Reporter, Station & Status
              ========================================================= */}
           {activeSubTab === 'resolution_list' && (
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -985,7 +1026,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                   {/* Search Input */}
                   <input
                     type="text"
-                    placeholder="Search title, location, PIC..."
+                    placeholder="Search title, PIC..."
                     value={listSearchQuery}
                     onChange={(e) => setListSearchQuery(e.target.value)}
                     style={{
@@ -993,7 +1034,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                       borderRadius: '5px',
                       border: '1px solid #cbd5e1',
                       fontSize: '12px',
-                      width: '200px',
+                      width: '180px',
                       outline: 'none'
                     }}
                   />
@@ -1044,7 +1085,30 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     ))}
                   </select>
 
-                  {/* 3. Status Filter */}
+                  {/* 3. Station Filter (In-Table) */}
+                  <select
+                    value={listStationFilter}
+                    onChange={(e) => setListStationFilter(e.target.value)}
+                    className="notranslate"
+                    translate="no"
+                    style={{
+                      padding: '7px 10px',
+                      borderRadius: '5px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#0d3b66',
+                      backgroundColor: '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">All Stations ({uniqueStations.length})</option>
+                    {uniqueStations.map((stn) => (
+                      <option key={stn} value={stn}>{stn}</option>
+                    ))}
+                  </select>
+
+                  {/* 4. Status Filter */}
                   <select
                     value={listStatusFilter}
                     onChange={(e) => setListStatusFilter(e.target.value)}
@@ -1059,7 +1123,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                       cursor: 'pointer'
                     }}
                   >
-                    <option value="all">All Records ({filteredIndividualIssues.length})</option>
+                    <option value="all">All Records ({individualIssueMetrics.length})</option>
                     <option value="closed_ontime">Resolved (On-Time)</option>
                     <option value="closed_delayed">Resolved (Delayed)</option>
                     <option value="active_overdue">Active Overdue</option>
@@ -1067,6 +1131,34 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     <option value="all_closed">All Closed</option>
                     <option value="all_active">All Active</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Graf Agregat Skala Besar: Taburan Julat Kelewatan (Sangat sesuai untuk ribuan data) */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <h4 style={{ margin: 0, fontSize: '13px', color: '#0d3b66' }}>
+                    📊 Overall Delay Distribution Breakdown (Active Filters: {filteredIndividualIssues.length} issues)
+                  </h4>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>
+                    Menunjukkan pecahan kelewatan isu sama ada tepat pada masa, lewat 1-3 hari, 4-7 hari, atau kritikal (>7 hari)
+                  </span>
+                </div>
+
+                <div style={{ width: '100%', height: '170px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={delayBracketData} margin={{ top: 15, right: 20, left: -10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="range" tick={{ fontSize: 11, fontWeight: 'bold' }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(val) => [`${val} Issues`, 'Total']} />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} label={{ position: 'top', fill: '#0d3b66', fontSize: 11, fontWeight: 'bold' }}>
+                        {delayBracketData.map((entry, index) => (
+                          <Cell key={`bracket-cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
 
