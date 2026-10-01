@@ -228,7 +228,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       const isDone = isClosedStatus(issue.status);
       const openDate = parseDateSafe(issue.date_time || issue.created_at);
       const estCloseDate = parseDateSafe(issue.estimated_closing);
-      const actualClosedDate = parseDateSafe(issue.updated_at || issue.date_time);
+      const actualClosedDate = parseDateSafe(issue.closed_date || issue.updated_at || issue.date_time);
 
       let actualDays = 0;
       let targetDays = null;
@@ -259,7 +259,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         ...issue,
         isDone,
         openDateRaw: issue.date_time || issue.created_at,
-        closedDateRaw: isDone ? (issue.updated_at || issue.date_time) : null,
+        closedDateRaw: isDone ? (issue.closed_date || issue.updated_at || issue.date_time) : null,
         estDateRaw: issue.estimated_closing,
         reporterName: issue.staff_name || issue.staff_id || '-',
         stationName: issue.location ? issue.location.toUpperCase() : '-',
@@ -337,7 +337,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
       const isDone = isClosedStatus(item.status);
       const openDate = parseDateSafe(item.date_time || item.created_at);
       const estCloseDate = parseDateSafe(item.estimated_closing);
-      const actualClosedDate = parseDateSafe(item.updated_at || item.date_time);
+      const actualClosedDate = parseDateSafe(item.closed_date || item.updated_at || item.date_time);
 
       if (isDone) {
         closedCount++;
@@ -578,6 +578,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     );
   };
 
+  // Static label inside bar (no flickering)
   const renderInsideBarLabel = (props) => {
     const { x, y, width, height, value } = props;
     if (!value || height < 14) return null;
@@ -588,7 +589,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         fill="#ffffff"
         textAnchor="middle"
         dominantBaseline="middle"
-        style={{ fontSize: '13px', fontWeight: 'bold' }}
+        style={{ fontSize: '13px', fontWeight: 'bold', pointerEvents: 'none' }}
       >
         {value}
       </text>
@@ -810,12 +811,14 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           ]} 
                         />
 
+                        {/* Disabled animation to eliminate number blinking/flickering */}
                         <Bar 
                           yAxisId="left" 
                           dataKey="count" 
                           name="Count"
                           barSize={46}
                           radius={[4, 4, 0, 0]}
+                          isAnimationActive={false}
                           label={renderInsideBarLabel}
                         >
                           {statusComboData.map((entry, idx) => (
@@ -831,6 +834,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           stroke="#b91c1c" 
                           strokeWidth={3} 
                           dot={{ r: 5, fill: '#b91c1c' }}
+                          isAnimationActive={false}
                           label={(props) => {
                             const { x, y, index } = props;
                             const percent = statusComboData[index]?.percentage;
@@ -841,7 +845,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                                 y={y - 12}
                                 fill="#b91c1c"
                                 textAnchor="middle"
-                                style={{ fontSize: '12px', fontWeight: 'bold' }}
+                                style={{ fontSize: '12px', fontWeight: 'bold', pointerEvents: 'none' }}
                               >
                                 {`${percent}%`}
                               </text>
@@ -875,6 +879,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                             paddingAngle={2}
                             dataKey="value"
                             labelLine={true}
+                            isAnimationActive={false}
                             label={renderCustomPercentageLabel}
                             cursor="pointer"
                             onClick={(entry) => setSelectedClassification((prev) => prev === entry.name ? null : entry.name)}
@@ -914,8 +919,8 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         <YAxis allowDecimals={false} />
                         <Tooltip />
                         <Legend />
-                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -963,6 +968,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               paddingAngle={3}
                               dataKey="count"
                               labelLine={true}
+                              isAnimationActive={false}
                               label={renderAgingPercentageLabel}
                             >
                               {agingData.map((entry, idx) => (
@@ -1014,7 +1020,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         <XAxis dataKey="location" interval={0} angle={-30} textAnchor="end" height={50} />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={false} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
