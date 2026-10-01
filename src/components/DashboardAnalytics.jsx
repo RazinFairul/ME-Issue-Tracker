@@ -578,10 +578,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     );
   };
 
-  // Static label inside bar (no flickering)
+  // Smooth, non-flickering label inside the bar
   const renderInsideBarLabel = (props) => {
     const { x, y, width, height, value } = props;
-    if (!value || height < 14) return null;
+    if (!value || height < 16) return null;
     return (
       <text
         x={x + width / 2}
@@ -589,9 +589,27 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
         fill="#ffffff"
         textAnchor="middle"
         dominantBaseline="middle"
-        style={{ fontSize: '13px', fontWeight: 'bold', pointerEvents: 'none' }}
+        style={{ fontSize: '13px', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none' }}
       >
         {value}
+      </text>
+    );
+  };
+
+  // Smooth, non-flickering line percentage label
+  const renderLinePercentageLabel = (props) => {
+    const { x, y, index } = props;
+    const percent = statusComboData[index]?.percentage;
+    if (percent === undefined || percent === null) return null;
+    return (
+      <text
+        x={x}
+        y={y - 12}
+        fill="#b91c1c"
+        textAnchor="middle"
+        style={{ fontSize: '12px', fontWeight: 'bold', pointerEvents: 'none', userSelect: 'none' }}
+      >
+        {`${percent}%`}
       </text>
     );
   };
@@ -811,14 +829,16 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           ]} 
                         />
 
-                        {/* Disabled animation to eliminate number blinking/flickering */}
+                        {/* Smooth active animation with flicker-free stable label */}
                         <Bar 
                           yAxisId="left" 
                           dataKey="count" 
                           name="Count"
                           barSize={46}
                           radius={[4, 4, 0, 0]}
-                          isAnimationActive={false}
+                          isAnimationActive={true}
+                          animationDuration={800}
+                          animationEasing="ease-out"
                           label={renderInsideBarLabel}
                         >
                           {statusComboData.map((entry, idx) => (
@@ -834,23 +854,10 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                           stroke="#b91c1c" 
                           strokeWidth={3} 
                           dot={{ r: 5, fill: '#b91c1c' }}
-                          isAnimationActive={false}
-                          label={(props) => {
-                            const { x, y, index } = props;
-                            const percent = statusComboData[index]?.percentage;
-                            if (percent === undefined || percent === null) return null;
-                            return (
-                              <text
-                                x={x}
-                                y={y - 12}
-                                fill="#b91c1c"
-                                textAnchor="middle"
-                                style={{ fontSize: '12px', fontWeight: 'bold', pointerEvents: 'none' }}
-                              >
-                                {`${percent}%`}
-                              </text>
-                            );
-                          }}
+                          isAnimationActive={true}
+                          animationDuration={800}
+                          animationEasing="ease-out"
+                          label={renderLinePercentageLabel}
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
@@ -861,7 +868,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
                     <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
-                      🏷️ Classification (Click slice to cross-filter)
+                      🏷️️ Classification (Click slice to cross-filter)
                     </h3>
                   </div>
                   <div style={{ width: '100%', height: '280px' }}>
@@ -879,7 +886,8 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                             paddingAngle={2}
                             dataKey="value"
                             labelLine={true}
-                            isAnimationActive={false}
+                            isAnimationActive={true}
+                            animationDuration={800}
                             label={renderCustomPercentageLabel}
                             cursor="pointer"
                             onClick={(entry) => setSelectedClassification((prev) => prev === entry.name ? null : entry.name)}
@@ -919,8 +927,8 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         <YAxis allowDecimals={false} />
                         <Tooltip />
                         <Legend />
-                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
-                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="Created" stroke="#0284c7" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={true} animationDuration={800} />
+                        <Line type="monotone" dataKey="Closed" stroke="#16a34a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={true} animationDuration={800} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -968,7 +976,8 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                               paddingAngle={3}
                               dataKey="count"
                               labelLine={true}
-                              isAnimationActive={false}
+                              isAnimationActive={true}
+                              animationDuration={800}
                               label={renderAgingPercentageLabel}
                             >
                               {agingData.map((entry, idx) => (
@@ -1020,7 +1029,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                         <XAxis dataKey="location" interval={0} angle={-30} textAnchor="end" height={50} />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={800} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
