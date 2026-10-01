@@ -26,14 +26,27 @@ const CLASS_COLORS = {
   'UNCLASSIFIED': '#94a3b8'
 };
 
+// Standard baseline groups matching CreateIssue & shop-floor standards
+const DEFAULT_GROUPS = [
+  'Assembly Line',
+  'Cold Test',
+  'Hot Test',
+  'Dyno Test',
+  '7DCT',
+  'EDU & DHT',
+  'IT'
+];
+
 export default function DashboardAnalytics({ onBack, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [rawIssues, setRawIssues] = useState([]);
+  const [dbMasterGroups, setDbMasterGroups] = useState([]);
+  const [dbMasterStations, setDbMasterStations] = useState([]);
   
-  // Navigation Tab inside Analytics: 'overview' vs 'resolution_list'
+  // Navigation sub-tab inside Analytics: 'overview' vs 'resolution_list'
   const [activeSubTab, setActiveSubTab] = useState('overview');
 
-  // Date Filters
+  // Global Header Date & Group Filters
   const [filterMode, setFilterMode] = useState('all'); 
   const [timeRange, setTimeRange] = useState('all'); 
   
@@ -74,18 +87,33 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     closedTotal: 0
   });
 
+  // Fetch Master Data from Stations and Issues table
   useEffect(() => {
-    async function loadData() {
+    async function loadAllData() {
       setLoading(true);
-      const { data, error } = await supabase.from('issues').select('*').order('date_time', { ascending: false });
-      if (error) {
-        console.error('Error fetching issues:', error.message);
-      } else {
-        setRawIssues(data || []);
+      try {
+        const [issuesRes, stationsRes] = await Promise.all([
+          supabase.from('issues').select('*').order('date_time', { ascending: false }),
+          supabase.from('stations').select('station_code, group_name').order('station_code', { ascending: true })
+        ]);
+
+        if (issuesRes.data) {
+          setRawIssues(issuesRes.data);
+        }
+
+        if (stationsRes.data) {
+          const stnList = stationsRes.data.map((s) => s.station_code).filter(Boolean);
+          const grpList = stationsRes.data.map((s) => s.group_name).filter(Boolean);
+          setDbMasterStations(Array.from(new Set(stnList)));
+          setDbMasterGroups(Array.from(new Set(grpList)));
+        }
+      } catch (err) {
+        console.error('Error loading analytics dataset:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
-    loadData();
+    loadAllData();
   }, []);
 
   const getWeekOfMonth = (dayNumber) => {
@@ -137,6 +165,13 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     return dateStr;
   };
 
+  // Dynamically assemble all available groups (Baseline + Master DB + Issues DB)
+  const availableGroupsList = useMemo(() => {
+    const fromIssues = rawIssues.map((i) => i.group_name).filter(Boolean);
+    const combined = [...DEFAULT_GROUPS, ...dbMasterGroups, ...fromIssues];
+    return Array.from(new Set(combined)).sort();
+  }, [rawIssues, dbMasterGroups]);
+
   // Filtered dataset based on header filters
   const dateAndGroupFiltered = useMemo(() => {
     const now = new Date();
@@ -185,7 +220,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [rawIssues, selectedGroup, filterMode, timeRange, selectedMonth, selectedWeek, selectedYear]);
 
-  // Individual issue resolution calculation
+  // Individual issue resolution metrics calculation
   const individualIssueMetrics = useMemo(() => {
     const now = new Date();
 
@@ -236,7 +271,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     });
   }, [dateAndGroupFiltered]);
 
-  // Dynamic unique lists for table filters
+  // Dynamic unique lists for in-table filter dropdowns
   const uniqueReporters = useMemo(() => {
     const names = individualIssueMetrics
       .map((i) => i.reporterName)
@@ -244,19 +279,11 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
     return Array.from(new Set(names)).sort();
   }, [individualIssueMetrics]);
 
-  const uniqueGroups = useMemo(() => {
-    const groups = individualIssueMetrics
-      .map((i) => i.group_name)
-      .filter((g) => g && g !== '-');
-    return Array.from(new Set(groups)).sort();
-  }, [individualIssueMetrics]);
-
   const uniqueStations = useMemo(() => {
-    const stations = individualIssueMetrics
-      .map((i) => i.stationName)
-      .filter((s) => s && s !== '-');
-    return Array.from(new Set(stations)).sort();
-  }, [individualIssueMetrics]);
+    const fromIssues = individualIssueMetrics.map((i) => i.stationName).filter((s) => s && s !== '-');
+    const combined = [...dbMasterStations, ...fromIssues];
+    return Array.from(new Set(combined.map((s) => s.toUpperCase()))).sort();
+  }, [individualIssueMetrics, dbMasterStations]);
 
   const processDashboard = useCallback(() => {
     if (!dateAndGroupFiltered.length) {
@@ -584,7 +611,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
           <small style={{ opacity: 0.85, fontSize: '12px' }}>Manufacturing Engineering Executive Performance & Issue Tracking</small>
         </div>
         
-        {/* Dropdown Filters */}
+        {/* Dropdown Filters (Synchronized with Available Groups) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           
           <select
@@ -595,13 +622,9 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
             style={{ padding: '7px 10px', borderRadius: '5px', border: 'none', fontWeight: 'bold', cursor: 'pointer', color: '#0d3b66', backgroundColor: '#fff' }}
           >
             <option value="all">All Groups</option>
-            <option value="Assembly Line">Assembly Line</option>
-            <option value="Cold Test">Cold Test</option>
-            <option value="Hot Test">Hot Test</option>
-            <option value="Dyno Test">Dyno Test</option>
-            <option value="7DCT">7DCT</option>
-            <option value="EDU & DHT">EDU & DHT</option>
-            <option value="IT">IT</option>
+            {availableGroupsList.map((grp) => (
+              <option key={grp} value={grp}>{grp}</option>
+            ))}
           </select>
 
           <select
@@ -1020,7 +1043,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* Search Input with clean "Search..." placeholder */}
+                  {/* Search Input */}
                   <input
                     type="text"
                     placeholder="Search..."
@@ -1054,7 +1077,7 @@ export default function DashboardAnalytics({ onBack, onLogout }) {
                     }}
                   >
                     <option value="all">All Groups</option>
-                    {uniqueGroups.map((grp) => (
+                    {availableGroupsList.map((grp) => (
                       <option key={grp} value={grp}>{grp}</option>
                     ))}
                   </select>
