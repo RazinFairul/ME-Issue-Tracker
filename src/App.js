@@ -12,7 +12,7 @@ import LanguageSelector from './components/LanguageSelector';
 
 const TIMEOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes inactivity timeout (300,000 ms)
 
-// Clean Vector Mini Analog Clock Component
+// Clean Vector Mini Analog Clock Component (Refined Thinner Border & Larger Dial)
 const MiniAnalogClock = ({ time = new Date() }) => {
   const seconds = time.getSeconds();
   const minutes = time.getMinutes();
@@ -23,24 +23,24 @@ const MiniAnalogClock = ({ time = new Date() }) => {
   const hourAngle = hours * 30 + minutes * 0.5; // 360deg / 12h
 
   return (
-    <svg width="34" height="34" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
-      {/* Outer Dial Face */}
-      <circle cx="50" cy="50" r="45" fill="#092540" stroke="#38bdf8" strokeWidth="3" />
+    <svg width="44" height="44" viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+      {/* Outer Dial Face with Thinner Border */}
+      <circle cx="50" cy="50" r="47" fill="#092540" stroke="#38bdf8" strokeWidth="1.5" />
 
       {/* Hour Markers (12, 3, 6, 9) */}
-      <line x1="50" y1="10" x2="50" y2="17" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-      <line x1="90" y1="50" x2="83" y2="50" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-      <line x1="50" y1="90" x2="50" y2="83" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
-      <line x1="10" y1="50" x2="17" y2="50" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" />
+      <line x1="50" y1="8" x2="50" y2="15" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+      <line x1="92" y1="50" x2="85" y2="50" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+      <line x1="50" y1="92" x2="50" y2="85" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+      <line x1="8" y1="50" x2="15" y2="50" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
 
       {/* Hour Hand */}
       <line
         x1="50"
         y1="50"
         x2="50"
-        y2="28"
+        y2="26"
         stroke="#ffffff"
-        strokeWidth="5"
+        strokeWidth="3.5"
         strokeLinecap="round"
         transform={`rotate(${hourAngle} 50 50)`}
       />
@@ -50,9 +50,9 @@ const MiniAnalogClock = ({ time = new Date() }) => {
         x1="50"
         y1="50"
         x2="50"
-        y2="18"
+        y2="16"
         stroke="#38bdf8"
-        strokeWidth="3.5"
+        strokeWidth="2.5"
         strokeLinecap="round"
         transform={`rotate(${minAngle} 50 50)`}
       />
@@ -60,17 +60,17 @@ const MiniAnalogClock = ({ time = new Date() }) => {
       {/* Second Hand (Red Accent) */}
       <line
         x1="50"
-        y1="56"
+        y1="58"
         x2="50"
-        y2="14"
+        y2="12"
         stroke="#ef4444"
-        strokeWidth="2"
+        strokeWidth="1.5"
         strokeLinecap="round"
         transform={`rotate(${secAngle} 50 50)`}
       />
 
       {/* Center Pivot Pin */}
-      <circle cx="50" cy="50" r="3.5" fill="#ffffff" />
+      <circle cx="50" cy="50" r="3" fill="#ffffff" />
     </svg>
   );
 };
@@ -474,18 +474,18 @@ export default function App() {
         {/* Separated Clock Layout: Circular Analog (Left) + Rectangular Digital (Right) */}
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
           
-          {/* 1. Standalone Circular Analog Clock Badge */}
+          {/* 1. Standalone Circular Analog Clock Badge (Larger Face, Thinner Border) */}
           <div
             style={{
-              width: '46px',
-              height: '46px',
+              width: '50px',
+              height: '50px',
               borderRadius: '50%',
               backgroundColor: '#0d3b66',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 3px 10px rgba(13, 59, 102, 0.25)',
-              border: '2px solid rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
               flexShrink: 0
             }}
           >
