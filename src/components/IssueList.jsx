@@ -325,6 +325,21 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     }
   };
 
+  // Helper to extract clean YYYY-MM-DD
+  const getCleanDate = (dateVal) => {
+    if (!dateVal) return '';
+    return dateVal.split('T')[0].split(' ')[0];
+  };
+
+  // Earliest date threshold for closed_date (must not be before estimated_closing)
+  const minAllowedClosingDate = useMemo(() => {
+    if (!selectedIssue) return '';
+    const est = getCleanDate(selectedIssue.estimated_closing);
+    if (est) return est;
+    const opened = getCleanDate(selectedIssue.date_time || selectedIssue.created_at);
+    return opened || '';
+  }, [selectedIssue]);
+
   const loadOriginalIssueData = (issue) => {
     let cur = issue.status || 'In Progress (1/4)';
     if (cur === 'Open') cur = 'In Progress (1/4)';
@@ -333,10 +348,18 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
     }
     setModalStatus(cur);
 
-    // Initial actual closing date setup
-    const existingClosedDate = issue.closed_date 
-      ? issue.closed_date.split('T')[0] 
-      : (cur.includes('4/4') && issue.updated_at ? issue.updated_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+    const minDate = getCleanDate(issue.estimated_closing) || getCleanDate(issue.date_time || issue.created_at);
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let existingClosedDate = issue.closed_date 
+      ? getCleanDate(issue.closed_date) 
+      : (cur.includes('4/4') && issue.updated_at ? getCleanDate(issue.updated_at) : todayStr);
+
+    // Prevent default being earlier than min allowed
+    if (minDate && existingClosedDate && existingClosedDate < minDate) {
+      existingClosedDate = minDate;
+    }
+
     setActualClosingDate(existingClosedDate);
 
     const matrix = issue.progress_matrix && typeof issue.progress_matrix === 'object' ? issue.progress_matrix : {};
@@ -372,8 +395,13 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
   const handleStatusChange = (newStatus) => {
     setModalStatus(newStatus);
 
-    if (newStatus.includes('4/4') && !actualClosingDate) {
-      setActualClosingDate(new Date().toISOString().split('T')[0]);
+    if (newStatus.includes('4/4')) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      let initialDate = actualClosingDate || todayStr;
+      if (minAllowedClosingDate && initialDate < minAllowedClosingDate) {
+        initialDate = minAllowedClosingDate;
+      }
+      setActualClosingDate(initialDate);
     }
 
     let targetStage = '2/4';
@@ -421,7 +449,14 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
         if (draft.stageDetails) {
           setStageDetails(draft.stageDetails);
           setModalStatus(draft.modalStatus || issue.status || 'In Progress (1/4)');
-          setActualClosingDate(draft.actualClosingDate || new Date().toISOString().split('T')[0]);
+          
+          let draftClosing = draft.actualClosingDate || new Date().toISOString().split('T')[0];
+          const minDate = getCleanDate(issue.estimated_closing) || getCleanDate(issue.date_time || issue.created_at);
+          if (minDate && draftClosing < minDate) {
+            draftClosing = minDate;
+          }
+          setActualClosingDate(draftClosing);
+
           setRootCause(draft.rootCause ?? '');
           setCountermeasure(draft.countermeasure ?? '');
           setActiveStageTab(draft.activeStageTab || '2/4');
@@ -567,10 +602,19 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
       return;
     }
 
+    const isClosing = modalStatus.includes('4/4') || modalStatus === 'Closed';
+
+    // Strict validation: Actual closed date cannot be before Est. Closing Date
+    if (isClosing && actualClosingDate && minAllowedClosingDate) {
+      if (actualClosingDate < minAllowedClosingDate) {
+        alert(`Validation Error: Actual Closed Date cannot be earlier than Est. Closing Date (${formatDateOnly(minAllowedClosingDate)}).`);
+        return;
+      }
+    }
+
     setUpdating(true);
     const now = new Date().toISOString();
 
-    const isClosing = modalStatus.includes('4/4') || modalStatus === 'Closed';
     const finalClosedDate = isClosing 
       ? (actualClosingDate ? new Date(actualClosingDate).toISOString() : now)
       : null;
@@ -1282,7 +1326,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                           onClick={() => handleOpenUpdateModal(issue)}
                           style={{ border: 'none', backgroundColor: '#e9ecef', cursor: 'pointer', padding: '5px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', color: '#333' }}
                         >
-                          ✏️️ Update
+                          ✏ Update
                         </button>
 
                         <button
@@ -1367,7 +1411,7 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                   <option value="Closed (4/4)">⚫ Closed (4/4)</option>
                 </select>
 
-                {/* Actual Closing Date field when status is Closed (4/4) */}
+                {/* Actual Closing Date field with validation locking */}
                 {modalStatus.includes('4/4') && (
                   <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px' }}>
                     <label style={{ display: 'block', fontWeight: 'bold', fontSize: '12px', color: '#065f46', marginBottom: '4px' }}>
@@ -1375,8 +1419,17 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     </label>
                     <input
                       type="date"
+                      min={minAllowedClosingDate || undefined}
                       value={actualClosingDate}
-                      onChange={(e) => setActualClosingDate(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (minAllowedClosingDate && val && val < minAllowedClosingDate) {
+                          alert(`Notice: Actual closed date cannot be earlier than Est. Closing Date (${formatDateOnly(minAllowedClosingDate)}). Automatically adjusted.`);
+                          setActualClosingDate(minAllowedClosingDate);
+                        } else {
+                          setActualClosingDate(val);
+                        }
+                      }}
                       style={{
                         padding: '6px 10px',
                         borderRadius: '5px',
@@ -1389,7 +1442,11 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                       }}
                     />
                     <small style={{ color: '#047857', display: 'block', marginTop: '4px', fontSize: '11px' }}>
-                      *Set when this issue was actually resolved. You can backdate if the issue was closed earlier.
+                      {minAllowedClosingDate ? (
+                        <>🔒 *Locked to on or after Est. Closing Date (<strong>{formatDateOnly(minAllowedClosingDate)}</strong>).</>
+                      ) : (
+                        <>*Set when this issue was physically closed.</>
+                      )}
                     </small>
                   </div>
                 )}
@@ -1477,7 +1534,6 @@ export default function IssueList({ onBackToDashboard, onLogout, refreshTrigger 
                     {activeStageTab === '4/4' ? 'Action & Verification for Closed (4/4):' : `Progress & Remark for In Progress ${activeStageTab}:`}
                   </span>
 
-                  {/* Manual Forward Button */}
                   {activeStageTab !== '2/4' && (
                     <button
                       type="button"
