@@ -400,7 +400,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
   };
 
   // ==========================================
-  // AI VOICE LOGIC: Groq / Gemini Auto-Fill
+  // AI VOICE LOGIC: Groq Whisper + Llama 3.1
   // ==========================================
   const startVoiceRecording = async () => {
     try {
@@ -444,15 +444,14 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
       const groqKey = process.env.REACT_APP_GROQ_API_KEY;
 
       if (!groqKey) {
-        throw new Error('Groq API Key not found. Please set REACT_APP_GROQ_API_KEY in your .env file.');
+        throw new Error('Groq API Key not found. Please set REACT_APP_GROQ_API_KEY in your environment variables.');
       }
 
-      // Step 1: Transcribe Audio using Whisper Large v3 on Groq
+      // Step 1: Transcribe Audio using Whisper Large v3
       setAiStatusMsg('Transcribing audio...');
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.webm');
       formData.append('model', 'whisper-large-v3');
-      formData.append('language', 'en');
 
       const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
         method: 'POST',
@@ -468,7 +467,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
       const speechText = whisperData.text || '';
       if (!speechText.trim()) throw new Error('No speech detected. Please speak louder into the microphone.');
 
-      // Step 2: Parse raw transcribed text into structured JSON matching shop-floor fields
+      // Step 2: Parse raw speech into structured JSON using llama-3.1-8b-instant
       setAiStatusMsg('Extracting issue fields...');
       const systemPrompt = `You are an automated shop-floor Manufacturing Execution System assistant.
 Convert this transcribed speech into a clean JSON structure:
@@ -491,7 +490,7 @@ Output STRICT JSON only with keys:
           Authorization: `Bearer ${groqKey}`
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'llama-3.1-8b-instant',
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: systemPrompt },
@@ -513,7 +512,7 @@ Output STRICT JSON only with keys:
       if (parsedJSON.location) setLocation(parsedJSON.location.toUpperCase());
       if (parsedJSON.classification) setClassification(parsedJSON.classification.toUpperCase());
 
-      // Set current datetime automatically if not set
+      // Auto-set current datetime if empty
       if (!dateTime) {
         const now = new Date();
         const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -576,7 +575,6 @@ Output STRICT JSON only with keys:
         fileUrl = urlData.publicUrl;
       }
 
-      // Initialise progress matrix with linkList mapped to Phase 1/4
       const initialProgressMatrix = {
         root_cause: '',
         countermeasure: '',
@@ -679,8 +677,7 @@ Output STRICT JSON only with keys:
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                animation: 'pulse 1.5s infinite'
+                gap: '6px'
               }}
             >
               <span>⏹️</span> Stop & Auto-Fill
