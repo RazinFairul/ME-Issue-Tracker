@@ -400,7 +400,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
   };
 
   // ==========================================
-  // AI VOICE LOGIC: Groq Whisper + Llama 3
+  // AI VOICE LOGIC: Groq Whisper + Active LLM
   // ==========================================
   const startVoiceRecording = async () => {
     try {
@@ -467,7 +467,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
       const speechText = whisperData.text || '';
       if (!speechText.trim()) throw new Error('No speech detected. Please speak louder into the microphone.');
 
-      // Step 2: Parse raw speech into structured JSON using llama3-8b-8192
+      // Step 2: Parse raw speech using active Production LLM openai/gpt-oss-20b
       setAiStatusMsg('Extracting issue fields...');
       const systemPrompt = `You are an automated shop-floor Manufacturing Execution System assistant.
 Convert this transcribed speech into a clean JSON structure:
@@ -490,7 +490,7 @@ Output STRICT JSON only with keys:
           Authorization: `Bearer ${groqKey}`
         },
         body: JSON.stringify({
-          model: 'llama3-8b-8192',
+          model: 'openai/gpt-oss-20b',
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: systemPrompt },
@@ -1114,7 +1114,7 @@ Output STRICT JSON only with keys:
                 borderRadius: '5px',
                 border: '1px solid #ccc',
                 boxSizing: 'border-box',
-                backgroundColor: '#fff',
+                backgroundColor: !groupName ? '#f8fafc' : '#fff',
                 color: engineVariant ? '#000' : '#888',
                 fontSize: '16px',
                 cursor: 'pointer'
