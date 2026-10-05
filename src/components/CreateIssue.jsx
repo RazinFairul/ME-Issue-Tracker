@@ -24,6 +24,13 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
   const [compressing, setCompressing] = useState(false);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
+  // AI Voice Recording States
+  const [isRecording, setIsRecording] = useState(false);
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiStatusMsg, setAiStatusMsg] = useState('');
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
   // Dynamic stations state
   const [stationList, setStationList] = useState([]);
   const [stationMode, setStationMode] = useState('select'); // 'select' | 'add' | 'delete'
@@ -392,6 +399,138 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
     }
   };
 
+  // ==========================================
+  // AI VOICE LOGIC: Groq / Gemini Auto-Fill
+  // ==========================================
+  const startVoiceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        await processVoiceWithAI(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setAiStatusMsg('Listening... Speak your issue clearly.');
+    } catch (err) {
+      console.error('Microphone access denied or error:', err);
+      alert('Unable to access microphone. Please ensure microphone permissions are granted.');
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setAiStatusMsg('Processing audio with AI...');
+    }
+  };
+
+  const processVoiceWithAI = async (audioBlob) => {
+    setAiProcessing(true);
+    try {
+      const groqKey = process.env.REACT_APP_GROQ_API_KEY;
+
+      if (!groqKey) {
+        throw new Error('Groq API Key not found. Please set REACT_APP_GROQ_API_KEY in your .env file.');
+      }
+
+      // Step 1: Transcribe Audio using Whisper Large v3 on Groq
+      setAiStatusMsg('Transcribing audio...');
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.webm');
+      formData.append('model', 'whisper-large-v3');
+      formData.append('language', 'en');
+
+      const whisperRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${groqKey}`
+        },
+        body: formData
+      });
+
+      const whisperData = await whisperRes.json();
+      if (!whisperRes.ok) throw new Error(whisperData?.error?.message || 'Speech transcription failed.');
+
+      const speechText = whisperData.text || '';
+      if (!speechText.trim()) throw new Error('No speech detected. Please speak louder into the microphone.');
+
+      // Step 2: Parse raw transcribed text into structured JSON matching shop-floor fields
+      setAiStatusMsg('Extracting issue fields...');
+      const systemPrompt = `You are an automated shop-floor Manufacturing Execution System assistant.
+Convert this transcribed speech into a clean JSON structure:
+Available Groups: "Assembly Line", "Cold Test", "Hot Test", "Dyno Test", "7DCT", "EDU & DHT", "IT".
+Available Classifications: "A", "B", "C". (A = Safety/Quality, B = Breakdown/Downtime, C = Minor).
+
+Output STRICT JSON only with keys:
+{
+  "whatIssue": "short title summarizing the defect",
+  "description": "detailed problem statement",
+  "groupName": "matched group or empty string",
+  "location": "station code e.g. STN3370M if mentioned or empty string",
+  "classification": "A or B or C or empty string"
+}`;
+
+      const chatRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${groqKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: speechText }
+          ],
+          temperature: 0.1
+        })
+      });
+
+      const chatData = await chatRes.json();
+      if (!chatRes.ok) throw new Error(chatData?.error?.message || 'AI parsing failed.');
+
+      const parsedJSON = JSON.parse(chatData.choices[0]?.message?.content || '{}');
+
+      // Step 3: Populate Form Inputs Automatically
+      if (parsedJSON.whatIssue) setWhatIssue(parsedJSON.whatIssue);
+      if (parsedJSON.description) setDescription(parsedJSON.description);
+      if (parsedJSON.groupName) setGroupName(parsedJSON.groupName);
+      if (parsedJSON.location) setLocation(parsedJSON.location.toUpperCase());
+      if (parsedJSON.classification) setClassification(parsedJSON.classification.toUpperCase());
+
+      // Set current datetime automatically if not set
+      if (!dateTime) {
+        const now = new Date();
+        const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        setDateTime(localIso);
+      }
+
+      setAiStatusMsg('✓ Form filled successfully via AI Voice!');
+      setTimeout(() => setAiStatusMsg(''), 4000);
+    } catch (err) {
+      console.error('AI Voice Processing Error:', err);
+      alert('AI Voice Assistant: ' + err.message);
+      setAiStatusMsg('');
+    } finally {
+      setAiProcessing(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (compressing) {
@@ -479,9 +618,7 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
         throw insertError;
       }
 
-      // 3. Clear draft after successful insertion to Supabase
       localStorage.removeItem(DRAFT_STORAGE_KEY);
-
       alert('Issue submitted successfully!');
 
       if (onIssueCreated) {
@@ -499,31 +636,100 @@ export default function CreateIssue({ onBackToDashboard, onIssueCreated, onLogou
   return (
     <div style={{ padding: '16px 20px 40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+      {/* Header and Action Controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ color: '#0d3b66', margin: 0 }}>Open Issue</h2>
-        {hasRestoredDraft && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
-              📝 Draft Loaded
-            </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* AI Voice Assistant Trigger Button */}
+          {!isRecording ? (
             <button
               type="button"
-              onClick={handleClearDraft}
+              onClick={startVoiceRecording}
+              disabled={aiProcessing || loading}
               style={{
-                background: 'none',
+                backgroundColor: aiProcessing ? '#94a3b8' : '#0284c7',
+                color: '#fff',
                 border: 'none',
-                color: '#dc2626',
-                fontSize: '12px',
-                cursor: 'pointer',
+                borderRadius: '5px',
+                padding: '8px 14px',
                 fontWeight: 'bold',
-                textDecoration: 'underline'
+                fontSize: '13px',
+                cursor: aiProcessing ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)'
               }}
             >
-              Clear Draft
+              <span>🎙️</span> {aiProcessing ? 'Processing AI...' : 'Speak Issue (AI)'}
             </button>
-          </div>
-        )}
+          ) : (
+            <button
+              type="button"
+              onClick={stopVoiceRecording}
+              style={{
+                backgroundColor: '#dc2626',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '5px',
+                padding: '8px 14px',
+                fontWeight: 'bold',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                animation: 'pulse 1.5s infinite'
+              }}
+            >
+              <span>⏹️</span> Stop & Auto-Fill
+            </button>
+          )}
+
+          {hasRestoredDraft && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                📝 Draft Loaded
+              </span>
+              <button
+                type="button"
+                onClick={handleClearDraft}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#dc2626',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  textDecoration: 'underline'
+                }}
+              >
+                Clear Draft
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* AI Voice Status Banner */}
+      {aiStatusMsg && (
+        <div style={{
+          backgroundColor: isRecording ? '#fee2e2' : '#eff6ff',
+          border: `1px solid ${isRecording ? '#fca5a5' : '#bfdbfe'}`,
+          color: isRecording ? '#991b1b' : '#1e40af',
+          borderRadius: '6px',
+          padding: '8px 12px',
+          marginBottom: '15px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <span>{isRecording ? '🔴' : '✨'}</span> {aiStatusMsg}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         
