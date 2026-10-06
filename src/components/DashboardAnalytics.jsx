@@ -82,8 +82,8 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
   const [trendData, setTrendData] = useState([]);
   const [agingData, setAgingData] = useState([]);
   
-  // Location Chart View State: '5', '10', '20', or 'all'
-  const [locationLimit, setLocationLimit] = useState('20');
+  // Location Chart View State: Set default to 'all'
+  const [locationLimit, setLocationLimit] = useState('all');
 
   const [hodSummary, setHodSummary] = useState({
     avgActualDays: 0,
@@ -115,7 +115,7 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
         }
       } catch (err) {
         console.error('Error loading analytics dataset:', err);
-      } finally {
+      } fontally {
         setLoading(false);
       }
     }
