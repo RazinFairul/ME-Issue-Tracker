@@ -686,8 +686,19 @@ export default function App() {
         />
       )}
 
-      {/* Footer */}
-      <div className="footer" style={{ textAlign: 'center', marginTop: '20px', fontSize: '12px', color: '#64748b' }}>
+      {/* Footer (Stacked Layout) */}
+      <div 
+        className="footer" 
+        style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          marginTop: '20px', 
+          fontSize: '12px', 
+          color: '#64748b' 
+        }}
+      >
         <div style={{ marginBottom: '4px', fontWeight: '500', letterSpacing: '0.5px' }}>
           <strong style={{ fontWeight: '800', color: '#0d3b66' }}>R</strong>eal Cause .{' '}
           <strong style={{ fontWeight: '800', color: '#0d3b66' }}>A</strong>nalysis & .{' '}
