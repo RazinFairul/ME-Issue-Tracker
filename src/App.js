@@ -571,7 +571,7 @@ export default function App() {
               {/* Proton Logo Positioned Above Manufacturing Engineering */}
               <div style={{ marginBottom: '12px' }}>
                 <img 
-                  src={`${process.env.PUBLIC_URL}/Proton Logo - nobackground.png`} 
+                  src={`${process.env.PUBLIC_URL}/proton-Logo.png`} 
                   alt="Proton Logo" 
                   style={{ height: '55px', width: 'auto', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} 
                 />
