@@ -115,7 +115,7 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
         }
       } catch (err) {
         console.error('Error loading analytics dataset:', err);
-      } fontally {
+      } finally {
         setLoading(false);
       }
     }
