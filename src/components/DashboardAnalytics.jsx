@@ -81,7 +81,9 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
   const [classificationData, setClassificationData] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [agingData, setAgingData] = useState([]);
-  const [showAllLocations, setShowAllLocations] = useState(false);
+  
+  // Location Chart View State: '5', '10', '20', or 'all'
+  const [locationLimit, setLocationLimit] = useState('20');
 
   const [hodSummary, setHodSummary] = useState({
     avgActualDays: 0,
@@ -571,8 +573,14 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
     );
   };
 
-  const displayedLocationData = showAllLocations ? locationData : locationData.slice(0, 20);
-  const chartWidth = showAllLocations ? Math.max(1000, locationData.length * 45) : '100%';
+  // Compute sliced location data based on dropdown selection
+  const displayedLocationData = useMemo(() => {
+    if (locationLimit === 'all') return locationData;
+    const num = parseInt(locationLimit, 10);
+    return locationData.slice(0, num);
+  }, [locationData, locationLimit]);
+
+  const chartWidth = locationLimit === 'all' ? Math.max(1000, locationData.length * 45) : '100%';
   const maxAxisValue = Math.max(stats.total, 1);
   const totalActiveBacklog = stats.inProgress;
 
@@ -967,26 +975,39 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
               <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '15px' }}>
                   <h3 style={{ margin: 0, color: '#0d3b66', fontSize: '16px' }}>
-                    📍 Issues Breakdown by Location/Station ({showAllLocations ? 'All' : 'Top 20'})
+                    📍 Issues Breakdown by Location/Station ({locationLimit === 'all' ? 'All' : `Top ${locationLimit}`})
                   </h3>
-                  <button
-                    onClick={() => setShowAllLocations(!showAllLocations)}
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      borderRadius: '4px',
-                      border: '1px solid #0d3b66',
-                      backgroundColor: '#fff',
-                      color: '#0d3b66',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {showAllLocations ? 'Show Top 20' : 'Show All'}
-                  </button>
+                  
+                  {/* Dropdown Selector for Top 5, Top 10, Top 20, or All */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label htmlFor="location-limit-select" style={{ fontSize: '12px', fontWeight: 'bold', color: '#0d3b66' }}>
+                      Display:
+                    </label>
+                    <select
+                      id="location-limit-select"
+                      value={locationLimit}
+                      onChange={(e) => setLocationLimit(e.target.value)}
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        borderRadius: '4px',
+                        border: '1px solid #0d3b66',
+                        backgroundColor: '#fff',
+                        color: '#0d3b66',
+                        cursor: 'pointer',
+                        outline: 'none'
+                      }}
+                    >
+                      <option value="5">Top 5</option>
+                      <option value="10">Top 10</option>
+                      <option value="20">Top 20</option>
+                      <option value="all">Show All</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div style={{ width: '100%', height: '350px', overflowX: showAllLocations ? 'auto' : 'hidden' }}>
+                <div style={{ width: '100%', height: '350px', overflowX: locationLimit === 'all' ? 'auto' : 'hidden' }}>
                   <div style={{ width: chartWidth, height: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={displayedLocationData} margin={{ top: 25, right: 30, left: 0, bottom: 25 }}>
@@ -995,7 +1016,6 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                         <YAxis allowDecimals={false} />
                         <Tooltip />
                         <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={800}>
-                          {/* Label diletakkan di atas bar */}
                           <LabelList 
                             dataKey="count" 
                             position="top" 
