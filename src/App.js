@@ -570,6 +570,14 @@ export default function App() {
             <div className="hero-title">
               <h1>Manufacturing Engineering</h1>
               <h2>DATA TRACKER</h2>
+              {/* Proton Logo under DATA TRACKER */}
+              <div style={{ marginTop: '12px', marginBottom: '8px' }}>
+                <img 
+                  src={`${process.env.PUBLIC_URL}/Proton Logo - nobackground.png`} 
+                  alt="Proton Logo" 
+                  style={{ height: '55px', width: 'auto', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} 
+                />
+              </div>
             </div>
 
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
