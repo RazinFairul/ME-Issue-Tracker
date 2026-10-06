@@ -37,18 +37,38 @@ export default function LandingPage({ onGoToLogin }) {
       className="embed-landing-container"
       style={{
         backgroundImage: `url(${bgImage})`,
-        position: 'relative'
+        position: 'relative',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justify: 'space-between'
       }}
     >
       {/* Floating Login Button */}
-      <button 
-        className="animated-login-btn" 
-        onClick={onGoToLogin}
-        title="Click to Log In"
-        aria-label="Log In"
-      >
-        LOGIN
-      </button>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <button 
+          className="animated-login-btn" 
+          onClick={onGoToLogin}
+          title="Click to Log In"
+          aria-label="Log In"
+        >
+          LOGIN
+        </button>
+      </div>
+
+      {/* Footer Text Overlay */}
+      <footer style={{ textAlign: 'center', padding: '15px 10px', fontSize: '12px', color: '#64748b', zIndex: 10 }}>
+        <div style={{ marginBottom: '4px', fontWeight: '500', letterSpacing: '0.5px' }}>
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>R</strong>eal Cause .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>A</strong>nalysis & .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>Z</strong>ero .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>I</strong>ssue Resolution .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>N</strong>etwork
+        </div>
+        <div>
+          © Developed by Razin ME
+        </div>
+      </footer>
     </div>
   );
 }

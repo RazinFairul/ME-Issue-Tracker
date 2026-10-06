@@ -687,8 +687,17 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <div className="footer">
-        <span>©</span> Developed by Razin ME
+      <div className="footer" style={{ textAlign: 'center', marginTop: '20px', fontSize: '12px', color: '#64748b' }}>
+        <div style={{ marginBottom: '4px', fontWeight: '500', letterSpacing: '0.5px' }}>
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>R</strong>eal Cause .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>A</strong>nalysis & .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>Z</strong>ero .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>I</strong>ssue Resolution .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>N</strong>etwork
+        </div>
+        <div>
+          <span>©</span> Developed by Razin ME
+        </div>
       </div>
 
       {/* Floating Bottom-Right Searchable Language Selector */}
