@@ -989,12 +989,21 @@ function DashboardAnalyticsComponent({ onBack, onLogout }) {
                 <div style={{ width: '100%', height: '350px', overflowX: showAllLocations ? 'auto' : 'hidden' }}>
                   <div style={{ width: chartWidth, height: '100%' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={displayedLocationData} margin={{ top: 20, right: 30, left: 0, bottom: 25 }}>
+                      <BarChart data={displayedLocationData} margin={{ top: 25, right: 30, left: 0, bottom: 25 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="location" interval={0} angle={-30} textAnchor="end" height={50} />
                         <YAxis allowDecimals={false} />
                         <Tooltip />
-                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={800} />
+                        <Bar dataKey="count" fill="#0d3b66" name="Total Issues" radius={[4, 4, 0, 0]} isAnimationActive={true} animationDuration={800}>
+                          {/* Label diletakkan di atas bar */}
+                          <LabelList 
+                            dataKey="count" 
+                            position="top" 
+                            offset={5} 
+                            fill="#0d3b66" 
+                            style={{ fontWeight: 'bold', fontSize: '12px' }} 
+                          />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
