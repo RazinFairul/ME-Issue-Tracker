@@ -568,16 +568,16 @@ export default function App() {
         <div className={`dashboard-grid ${isPortrait ? 'portrait-layout' : 'landscape-layout'}`}>
           <div className="hero-card">
             <div className="hero-title">
-              <h1>Manufacturing Engineering</h1>
-              <h2>DATA TRACKER</h2>
-              {/* Proton Logo under DATA TRACKER */}
-              <div style={{ marginTop: '12px', marginBottom: '8px' }}>
+              {/* Proton Logo Positioned Above Manufacturing Engineering */}
+              <div style={{ marginBottom: '12px' }}>
                 <img 
-                  src={`${process.env.PUBLIC_URL}/proton-logo.png`} 
+                  src={`${process.env.PUBLIC_URL}/Proton Logo - nobackground.png`} 
                   alt="Proton Logo" 
                   style={{ height: '55px', width: 'auto', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }} 
                 />
               </div>
+              <h1>Manufacturing Engineering</h1>
+              <h2>DATA TRACKER</h2>
             </div>
 
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
