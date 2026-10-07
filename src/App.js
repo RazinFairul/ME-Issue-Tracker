@@ -577,7 +577,8 @@ export default function App() {
                 />
               </div>
               <h1>Manufacturing Engineering</h1>
-              <h2>DATA TRACKER</h2>
+              <h2>Smart Tracking Data</h2>
+              <h3>R.A.Z.I.N</h3>
             </div>
 
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
