@@ -709,7 +709,7 @@ export default function App() {
         }}
       >
         <div style={{ marginBottom: '4px', fontWeight: '500', letterSpacing: '0.5px' }}>
-          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>R</strong>eal Cause .{' '}
+          <strong style={{ fontWeight: '800', color: '#0d3b66' }}>R</strong>eal-Cause .{' '}
           <strong style={{ fontWeight: '800', color: '#0d3b66' }}>A</strong>nalysis & .{' '}
           <strong style={{ fontWeight: '800', color: '#0d3b66' }}>Z</strong>ero .{' '}
           <strong style={{ fontWeight: '800', color: '#0d3b66' }}>I</strong>ssue Resolution .{' '}
