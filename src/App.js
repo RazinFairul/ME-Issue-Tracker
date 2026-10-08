@@ -717,7 +717,7 @@ export default function App() {
           <strong style={{ fontWeight: '800', color: '#0d3b66' }}>N</strong>etwork
         </div>
         <div>
-          <span>©</span> Developed by Razi ME
+          <span>©</span> Developed by Razin ME
         </div>
       </div>
 
